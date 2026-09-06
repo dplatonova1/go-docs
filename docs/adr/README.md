@@ -12,6 +12,8 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0003](./0003-form-catalog-positional-mapping.md) | Каталог форм: статичные шаблоны, fingerprint, маппинг по позиции | Accepted |
 | [0004](./0004-no-llm-at-runtime.md) | LLM только на этапе разработки, рантайм детерминированный | Accepted |
 | [0005](./0005-mrz-with-manual-confirmation.md) | MRZ вместо общего OCR + обязательное подтверждение полей | Accepted |
+| [0006](./0006-platform-billing-for-premium.md) | Премиум через платформенный биллинг (Google Play / Apple IAP), без своего бэкенда | Accepted |
+| [0007](./0007-privacy-policy-gate-for-cloud-sync.md) | Privacy policy — обязательное условие перед запуском облачной синхронизации | Accepted (вступает в силу в Фазе 6) |
 
 ## Когда заводить новый ADR
 

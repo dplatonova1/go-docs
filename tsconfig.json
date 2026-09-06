@@ -1,5 +1,14 @@
 {
   "extends": "@react-native/typescript-config",
+  "compilerOptions": {
+    // @react-native/typescript-config уже включает strict: true.
+    // Здесь — усиления сверх strict; если очередная библиотека принесёт
+    // типы, несовместимые с exactOptionalPropertyTypes, ослаблять точечно
+    // здесь, а не выключать strict целиком.
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "exactOptionalPropertyTypes": true
+  },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["**/node_modules", "**/Pods"]
 }
