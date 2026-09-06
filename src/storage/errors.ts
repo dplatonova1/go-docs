@@ -15,12 +15,30 @@ export const StorageErrorCode = {
   KeychainReadBackFailed: 'keychain-read-back-failed',
   /** Ключ существовал, но ОС его сбросила или он повреждён. */
   EncryptionKeyLost: 'encryption-key-lost',
+  /**
+   * Ключ записан в формате, который эта версия приложения не понимает —
+   * скорее всего, данные созданы более новой версией. Это НЕ повреждение:
+   * данные целы, их просто нельзя прочитать текущей сборкой.
+   */
+  KeyFormatUnsupported: 'key-format-unsupported',
+  /** Криптографический генератор случайных чисел недоступен. */
+  CsprngUnavailable: 'csprng-unavailable',
   /** Путь выходит за пределы приватной директории приложения. */
   PathOutsideSandbox: 'path-outside-sandbox',
   /** Путь синтаксически недопустим (пустой, абсолютный, с нулевым байтом). */
   InvalidPath: 'invalid-path',
   /** Файл не найден. */
   FileNotFound: 'file-not-found',
+  /**
+   * Файл повреждён, обрезан, изменён или зашифрован другим ключом.
+   * Обнаруживается проверкой тега аутентификации AES-GCM.
+   */
+  FileCorrupted: 'file-corrupted',
+  /**
+   * Файл записан более новой версией приложения. Данные целы, но текущая
+   * сборка их формат не понимает.
+   */
+  FileFormatUnsupported: 'file-format-unsupported',
   /** Сбой операции с БД. */
   DatabaseFailure: 'database-failure',
 } as const;

@@ -18,3 +18,15 @@ declare module 'react-native-get-random-values';
 declare const crypto: {
   getRandomValues<T extends ArrayBufferView>(array: T): T;
 };
+
+/**
+ * Hermes предоставляет `TextEncoder`/`TextDecoder`, как и Node в тестах,
+ * но в типах React Native их нет, а `lib.dom` мы не подключаем.
+ */
+declare class TextEncoder {
+  encode(input?: string): Uint8Array;
+}
+
+declare class TextDecoder {
+  decode(input?: ArrayBufferView | ArrayBuffer): string;
+}

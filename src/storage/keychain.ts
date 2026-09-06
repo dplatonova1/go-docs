@@ -23,11 +23,20 @@ import {
   SECURITY_LEVEL,
   STORAGE_TYPE,
   getGenericPassword,
+  hasGenericPassword,
   setGenericPassword,
 } from 'react-native-keychain';
 
 import { StorageError, StorageErrorCode } from './errors';
-import { FileEncoding, fileExists, saveFile, toRelativePath } from './fs';
+// Сырой слой, а не fs.ts: зашифрованный fs.ts сам зависит от этого
+// модуля (ему нужен ключ), и импорт fs.ts отсюда дал бы цикл. Отметка
+// служебная, персональных данных не содержит — шифровать её нечего.
+import {
+  FileEncoding,
+  rawExists,
+  rawWrite,
+  toRelativePath,
+} from './sandbox';
 
 /** Идентификатор записи в Keychain. Менять нельзя — потеряется доступ к ключу. */
 const SERVICE = 'com.godocs.encryption-key';
@@ -38,6 +47,23 @@ const ACCOUNT = 'godocs';
 /** 32 байта = 256 бит. */
 const KEY_LENGTH_BYTES = 32;
 const KEY_LENGTH_HEX = KEY_LENGTH_BYTES * 2;
+
+/**
+ * Версия формата хранения ключа.
+ *
+ * Ключ лежит в Keychain не голой строкой, а самоописывающимся конвертом
+ * `{"v":1,"k":"<hex>"}`. Это нужно, чтобы смена формата в будущем не
+ * читалась старым кодом как «ключ повреждён» — иначе обновление
+ * приложения приводило бы к ложной потере данных. Незнакомая версия —
+ * это `key-format-unsupported` («обновите приложение»), а не
+ * `encryption-key-lost` («всё пропало»).
+ */
+const KEY_FORMAT_VERSION = 1;
+
+type KeyEnvelope = {
+  readonly v: number;
+  readonly k: string;
+};
 
 /**
  * Отметка о том, что ключ когда-либо создавался.
@@ -81,8 +107,53 @@ const KEYCHAIN_OPTIONS = {
 /** Защита от гонки: параллельные вызовы не должны создать два разных ключа. */
 let inFlight: Promise<string> | undefined;
 
+/**
+ * Не даёт исходной ошибке утечь наружу целиком.
+ *
+ * На пути записи ключа нельзя прикреплять оригинальную ошибку как
+ * `cause`: секрет является аргументом вызова, а сообщения ошибок
+ * нативного моста иногда содержат аргументы. Оттуда они попали бы в
+ * logcat или обработчик ошибок. Наружу отдаём только тип.
+ */
+function errorKind(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
+
+/**
+ * Проверяет, что криптографический генератор на месте.
+ *
+ * Полифилл ставит `crypto.getRandomValues` при импорте. Если нативная
+ * часть не слинкована, обращение упало бы обычным TypeError в обход
+ * контракта модуля. Слабый ключ при этом не создаётся — но ошибка должна
+ * быть внятной.
+ */
+function requireCsprng(): void {
+  if (
+    typeof crypto === 'undefined' ||
+    typeof crypto.getRandomValues !== 'function'
+  ) {
+    throw new StorageError(
+      StorageErrorCode.CsprngUnavailable,
+      'Криптографический генератор случайных чисел недоступен — ' +
+        'ключ шифрования создать нельзя',
+    );
+  }
+}
+
 function generateKeyHex(): string {
+  requireCsprng();
+
   const bytes = crypto.getRandomValues(new Uint8Array(KEY_LENGTH_BYTES));
+
+  // Защита в глубину: подменённый или сломанный генератор (например,
+  // заглушка в тестах) может вернуть одни нули. Такой ключ формально
+  // корректен, но бесполезен, и обнаружить это потом невозможно.
+  if (bytes.every((byte) => byte === 0)) {
+    throw new StorageError(
+      StorageErrorCode.CsprngUnavailable,
+      'Генератор случайных чисел вернул вырожденное значение',
+    );
+  }
 
   let hex = '';
   for (const byte of bytes) {
@@ -94,6 +165,63 @@ function generateKeyHex(): string {
 
 function isWellFormedKey(value: string): boolean {
   return value.length === KEY_LENGTH_HEX && /^[0-9a-f]+$/.test(value);
+}
+
+function packKey(key: string): string {
+  const envelope: KeyEnvelope = { v: KEY_FORMAT_VERSION, k: key };
+  return JSON.stringify(envelope);
+}
+
+/**
+ * Разбирает конверт из Keychain.
+ *
+ * Разделяет три исхода, которые нельзя путать:
+ * - валидный ключ текущей версии;
+ * - незнакомая версия формата — данные целы, нужна другая сборка;
+ * - мусор — ключ действительно повреждён.
+ */
+function unpackKey(stored: string): string {
+  let parsed: unknown;
+
+  try {
+    parsed = JSON.parse(stored);
+  } catch {
+    throw new StorageError(
+      StorageErrorCode.EncryptionKeyLost,
+      'Ключ шифрования в защищённом хранилище повреждён',
+    );
+  }
+
+  if (
+    typeof parsed !== 'object' ||
+    parsed === null ||
+    typeof (parsed as KeyEnvelope).v !== 'number'
+  ) {
+    throw new StorageError(
+      StorageErrorCode.EncryptionKeyLost,
+      'Ключ шифрования в защищённом хранилище повреждён',
+    );
+  }
+
+  const envelope = parsed as KeyEnvelope;
+
+  if (envelope.v !== KEY_FORMAT_VERSION) {
+    throw new StorageError(
+      StorageErrorCode.KeyFormatUnsupported,
+      `Ключ сохранён в формате версии ${envelope.v}, эта сборка ` +
+        `поддерживает ${KEY_FORMAT_VERSION}. Данные целы — нужна более ` +
+        'новая версия приложения.',
+    );
+  }
+
+  if (typeof envelope.k !== 'string' || !isWellFormedKey(envelope.k)) {
+    throw new StorageError(
+      StorageErrorCode.EncryptionKeyLost,
+      'Ключ шифрования в защищённом хранилище повреждён',
+    );
+  }
+
+  return envelope.k;
 }
 
 /**
@@ -122,14 +250,28 @@ async function readStoredKey(): Promise<string | null> {
     return null;
   }
 
-  if (!isWellFormedKey(credentials.password)) {
+  return unpackKey(credentials.password);
+}
+
+/**
+ * Есть ли вообще запись в Keychain — независимо от того, удалось ли её
+ * прочитать.
+ *
+ * Нужно потому, что `getGenericPassword` возвращает `false` и когда
+ * записи нет, и при части сбоев чтения: эти случаи в API склеены. Перед
+ * созданием нового ключа нужно убедиться, что мы не затираем
+ * существующий, который просто не прочитался.
+ */
+async function keychainHasEntry(): Promise<boolean> {
+  try {
+    return await hasGenericPassword({ service: SERVICE });
+  } catch (error) {
     throw new StorageError(
-      StorageErrorCode.EncryptionKeyLost,
-      'Ключ шифрования в защищённом хранилище повреждён',
+      StorageErrorCode.KeychainUnavailable,
+      'Защищённое хранилище устройства недоступно',
+      error,
     );
   }
-
-  return credentials.password;
 }
 
 /**
@@ -142,12 +284,16 @@ async function readStoredKey(): Promise<string | null> {
  */
 async function storeKeyAndVerify(key: string): Promise<void> {
   try {
-    await setGenericPassword(ACCOUNT, key, KEYCHAIN_OPTIONS);
+    await setGenericPassword(ACCOUNT, packKey(key), KEYCHAIN_OPTIONS);
   } catch (error) {
+    // ВНИМАНИЕ: исходная ошибка сюда НЕ прикрепляется как cause.
+    // Ключ был аргументом этого вызова, а сообщения ошибок нативного
+    // моста могут содержать аргументы — тогда секрет ушёл бы в logcat
+    // или в обработчик ошибок. Наружу отдаём только тип ошибки.
     throw new StorageError(
       StorageErrorCode.KeychainUnavailable,
-      'Не удалось сохранить ключ в защищённом хранилище устройства',
-      error,
+      'Не удалось сохранить ключ в защищённом хранилище устройства ' +
+        `(${errorKind(error)})`,
     );
   }
 
@@ -166,7 +312,7 @@ async function createKey(): Promise<string> {
   const key = generateKeyHex();
 
   await storeKeyAndVerify(key);
-  await saveFile(
+  await rawWrite(
     KEY_MARKER_PATH,
     new Date().toISOString(),
     FileEncoding.Utf8,
@@ -182,8 +328,8 @@ async function resolveEncryptionKey(): Promise<string> {
     // Ключ есть, а отметки нет — например, приложение обновилось с
     // версии, где отметки ещё не было. Восстанавливаем её, чтобы в
     // следующий раз потеря ключа была распознана.
-    if (!(await fileExists(KEY_MARKER_PATH))) {
-      await saveFile(
+    if (!(await rawExists(KEY_MARKER_PATH))) {
+      await rawWrite(
         KEY_MARKER_PATH,
         new Date().toISOString(),
         FileEncoding.Utf8,
@@ -193,11 +339,34 @@ async function resolveEncryptionKey(): Promise<string> {
     return existing;
   }
 
-  if (await fileExists(KEY_MARKER_PATH)) {
+  if (await rawExists(KEY_MARKER_PATH)) {
+    // ОТЛОЖЕНО ДО ФАЗЫ 1 (SEC-004): отсюда нет выхода — приложение будет
+    // падать этой ошибкой при каждом запуске, а с зашифрованной базой не
+    // сможет показать даже перечень документов. Нужен явный, осознанный
+    // сброс из UI (стереть данные и начать заново) с честным
+    // предупреждением, что документы будут потеряны.
     throw new StorageError(
       StorageErrorCode.EncryptionKeyLost,
       'Ключ шифрования пропал из защищённого хранилища устройства. ' +
         'Ранее сохранённые документы расшифровать невозможно.',
+    );
+  }
+
+  // Файл-отметки нет — но прежде чем создавать ключ, убеждаемся, что в
+  // Keychain действительно пусто. `getGenericPassword` возвращает `false`
+  // не только когда записи нет, но и при части сбоев чтения; если
+  // поверить ему на слово, `setGenericPassword` затрёт существующий ключ
+  // и данные будут потеряны безвозвратно.
+  //
+  // ОТЛОЖЕНО ДО ФАЗЫ 1 (SEC-009): файл-отметка — вторая половина этой
+  // защиты, и она хрупкая: лежит открытым текстом и удаляется обычным
+  // deleteFile(). Стоит защитить её от случайного удаления.
+  if (await keychainHasEntry()) {
+    throw new StorageError(
+      StorageErrorCode.KeychainUnavailable,
+      'Защищённое хранилище сообщает, что ключ есть, но прочитать его ' +
+        'не удалось. Создавать новый нельзя — это уничтожило бы доступ ' +
+        'к сохранённым документам.',
     );
   }
 

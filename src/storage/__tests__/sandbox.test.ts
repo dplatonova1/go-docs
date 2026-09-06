@@ -7,7 +7,7 @@
  */
 
 import { StorageErrorCode, isStorageError } from '../errors';
-import { toRelativePath } from '../fs';
+import { toRelativePath } from '../sandbox';
 
 jest.mock('@dr.pogodin/react-native-fs', () => ({
   DocumentDirectoryPath: '/data/user/0/com.godocs/files',
