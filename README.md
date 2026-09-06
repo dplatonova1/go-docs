@@ -16,8 +16,10 @@
 ## Стек
 
 Bare React Native 0.87.1, TypeScript (strict), New Architecture
-(Fabric + TurboModules), Hermes. `op-sqlite`, `react-native-keychain`,
-`@dr.pogodin/react-native-fs`, `react-native-vision-camera`, `pdf-lib`.
+(Fabric + TurboModules), Hermes. `@op-engineering/op-sqlite`,
+`react-native-keychain`, `@dr.pogodin/react-native-fs`,
+`react-native-vision-camera` (V5, требует `react-native-nitro-modules` и
+`react-native-nitro-image`), `@cantoo/pdf-lib`.
 
 Не Expo — нужен прямой доступ к нативным проектам
 ([ADR-0001](docs/adr/0001-bare-react-native-new-architecture.md)).

@@ -5,16 +5,23 @@
   "scripts": {
     "android": "react-native run-android",
     "ios": "react-native run-ios",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings=0",
     "start": "react-native start",
     "test": "jest",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@cantoo/pdf-lib": "^2.9.1",
+    "@dr.pogodin/react-native-fs": "^2.40.2",
+    "@op-engineering/op-sqlite": "^18.2.0",
     "@react-native/new-app-screen": "0.87.1",
     "react": "19.2.3",
     "react-native": "0.87.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-keychain": "^10.0.0",
+    "react-native-nitro-image": "^0.15.2",
+    "react-native-nitro-modules": "^0.37.1",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-vision-camera": "^5.2.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

@@ -9,15 +9,21 @@ Accepted (2026-09-03, Фаза 0)
 Нужно кроссплатформенное мобильное приложение (Android приоритетно, iOS
 следом) со следующими нативными зависимостями:
 
-- `op-sqlite` — SQLite с нативным слоем;
+- `@op-engineering/op-sqlite` — SQLite с нативным слоем;
 - `react-native-keychain` — Keychain / Android Keystore;
 - `@dr.pogodin/react-native-fs` — файловая система;
-- `react-native-vision-camera` + MLKit-плагин для MRZ — нативный
-  frame processor.
+- `react-native-vision-camera` (V5) + MLKit-плагин для MRZ — нативный
+  frame processor; V5 обязательно тянет за собой
+  `react-native-nitro-modules` и `react-native-nitro-image`.
 
 Все они требуют доступа к нативному проекту. При этом приложение не
 использует сеть в рантайме (ADR-0002, ADR-0004), поэтому облачные сервисы
 сборки и OTA-обновлений ценности не добавляют.
+
+Отдельно про VisionCamera V5: она построена на Nitro Modules, а Nitro
+работает **только** на New Architecture — старый мост не поддерживается в
+принципе. То есть требование New Architecture здесь не «желательно ради
+производительности», а условие того, что проект вообще соберётся.
 
 ## Decision
 

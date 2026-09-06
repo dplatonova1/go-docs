@@ -1,12 +1,42 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!--
       INTERNET здесь намеренно НЕ объявлен: в фазах 0-5 приложение работает
       полностью офлайн (см. docs/adr/0002-local-first-storage.md и
-      docs/adr/0004-offline-deterministic-form-parsing.md). Разрешение нужно
-      только Metro в dev-сборках и объявлено в src/debug и src/debugOptimized.
-      Возвращать в main следует только вместе с ADR на облачную синхронизацию.
+      docs/adr/0004-no-llm-at-runtime.md). Разрешение нужно только Metro в
+      dev-сборках и объявлено в src/debug и src/debugOptimized. Возвращать
+      в main следует только вместе с ADR на облачную синхронизацию.
     -->
+
+    <!--
+      CAMERA — для сканирования машиносчитываемой зоны (MRZ) паспорта при
+      автозаполнении формы (react-native-vision-camera, Фаза 4). Кадр
+      обрабатывается на устройстве и никуда не передаётся — см.
+      docs/adr/0005-mrz-with-manual-confirmation.md.
+    -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+
+    <!--
+      Разрешения на общее хранилище приходят из манифеста
+      @dr.pogodin/react-native-fs, но нам не нужны: документы лежат в
+      приватной песочнице приложения (ADR-0002), экспорт пакета идёт
+      через системный Share/SAF, которому разрешения не требуются.
+      Без удаления на Android 7-10 это был бы живой запрос доступа ко
+      всему хранилищу пользователя. См.
+      docs/adr/0009-minimal-android-permissions.md.
+
+      ВНИМАНИЕ (Фаза 2): прямая запись в общие папки вроде Downloads
+      после этого работать не будет — экспорт делать только через
+      Share/SAF.
+    -->
+    <uses-permission
+        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        tools:node="remove" />
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        tools:node="remove" />
 
     <application
       android:name=".MainApplication"
