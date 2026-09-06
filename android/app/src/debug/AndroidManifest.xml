@@ -1,0 +1,6 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Только для dev-сборок: связь с Metro-бандлером и dev-меню. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>

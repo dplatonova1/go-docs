@@ -1,0 +1,109 @@
+# OSX
+#
+.DS_Store
+
+# Xcode
+#
+build/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata
+*.xccheckout
+*.moved-aside
+DerivedData
+*.hmap
+*.ipa
+*.xcuserstate
+**/.xcode.env.local
+
+# Android/IntelliJ
+#
+build/
+.idea
+.gradle
+local.properties
+*.iml
+*.hprof
+.cxx/
+*.keystore
+!debug.keystore
+.kotlin/
+
+# node.js
+#
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# fastlane
+#
+# It is recommended to not store the screenshots in the git repo. Instead, use fastlane to re-generate the
+# screenshots whenever they are needed.
+# For more information about the recommended setup visit:
+# https://docs.fastlane.tools/best-practices/source-control/
+
+**/fastlane/report.xml
+**/fastlane/Preview.html
+**/fastlane/screenshots
+**/fastlane/test_output
+
+# Bundle artifact
+*.jsbundle
+android/app/src/main/assets/index.android.bundle
+android/app/src/main/assets/index.android.bundle.map
+
+# Ruby / CocoaPods
+**/Pods/
+/vendor/bundle/
+
+# Temporary files created by Metro to check the health of the file watcher
+.metro-health-check*
+
+# testing
+/coverage
+
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# Release signing — никогда не коммитим ключи подписи и пароли к ним
+*.jks
+*.p12
+*.pfx
+*.mobileprovision
+android/keystore.properties
+android/app/keystore.properties
+android/app/*.jks
+android/app/release.keystore
+
+# Android build outputs
+android/app/build/
+android/.cxx/
+android/app/.cxx/
+*.apk
+*.aab
+
+# Пользовательские документы/фикстуры с реальными персональными данными
+# (тестовые формы кладём в __fixtures__ только обезличенными)
+/sandbox/
+*.local.json
+
+# Editors / OS
+.vscode/
+*.swp
+Thumbs.db

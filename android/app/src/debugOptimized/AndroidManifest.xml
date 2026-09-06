@@ -1,0 +1,10 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      debugOptimized — второй debuggable-вариант, который создаёт
+      React Native Gradle Plugin. Он не наследует src/debug, поэтому
+      разрешение на Metro дублируется здесь.
+    -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+</manifest>
