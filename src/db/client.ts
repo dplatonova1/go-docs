@@ -5,9 +5,7 @@
  * импортировать `@op-engineering/op-sqlite` напрямую.
  *
  * Здесь только доступ к хранилищу: ни запросов предметной области, ни
- * схемы приложения. Таблицы Фазы 0 (`applications`, `documents`,
- * `checklist_items`, `form_templates`) добавляются как миграции в массив
- * `MIGRATIONS` ниже.
+ * схемы приложения. Сама схема живёт в [`migrations.ts`](./migrations.ts).
  */
 
 import {
@@ -19,26 +17,13 @@ import {
 
 import { StorageError, StorageErrorCode } from '../storage/errors';
 import { getOrCreateEncryptionKey } from '../storage/keychain';
+import {
+  MIGRATIONS,
+  selectPendingMigrations,
+  type Migration,
+} from './migrations';
 
 const DATABASE_NAME = 'godocs.sqlite';
-
-/**
- * Одна миграция схемы. Порядок задаётся полем `id`, оно же записывается в
- * таблицу учёта — по нему определяется, что уже применено.
- *
- * Правила: `id` монотонно растёт, применённая миграция никогда не
- * редактируется (иначе на устройствах, где она уже отработала, изменения
- * не появятся) — вместо правки заводится следующая.
- */
-type Migration = {
-  readonly id: number;
-  readonly name: string;
-  readonly statements: readonly string[];
-};
-
-const MIGRATIONS: readonly Migration[] = [
-  // Схема предметной области добавляется сюда следующей задачей Фазы 0.
-];
 
 let connection: DB | undefined;
 /** Защита от гонки: параллельные вызовы не должны открыть два соединения. */
@@ -66,12 +51,54 @@ async function openConnection(): Promise<DB> {
 
   const encryptionKey = await getOrCreateEncryptionKey();
 
+  let db: DB;
+
   try {
-    return open({ name: DATABASE_NAME, encryptionKey });
+    db = open({ name: DATABASE_NAME, encryptionKey });
   } catch (error) {
     throw new StorageError(
       StorageErrorCode.DatabaseFailure,
       'Не удалось открыть локальную базу данных',
+      error,
+    );
+  }
+
+  await enableForeignKeys(db);
+
+  return db;
+}
+
+/**
+ * Включает проверку внешних ключей.
+ *
+ * В SQLite она выключена по умолчанию, и op-sqlite собран без
+ * `SQLITE_DEFAULT_FOREIGN_KEYS`. Без этого вызова все `REFERENCES ...
+ * ON DELETE CASCADE` в схеме — просто комментарии: удаление заявки не
+ * удалит её пункты чек-листа, а вставить пункт с несуществующим
+ * `application_id` можно будет беспрепятственно.
+ *
+ * Два важных свойства этого PRAGMA:
+ * - действует на соединение, а не на файл БД, поэтому выполняется при
+ *   каждом открытии;
+ * - внутри транзакции он не работает, поэтому вызывается до миграций.
+ *
+ * Результат проверяется: молча не сработавший PRAGMA — это тихо
+ * отключённая целостность данных.
+ */
+async function enableForeignKeys(db: DB): Promise<void> {
+  try {
+    await db.execute('PRAGMA foreign_keys = ON');
+    const result = await db.execute('PRAGMA foreign_keys');
+    const enabled = result.rows[0]?.foreign_keys;
+
+    if (enabled !== 1) {
+      throw new Error(`PRAGMA foreign_keys вернул ${String(enabled)}`);
+    }
+  } catch (error) {
+    throw new StorageError(
+      StorageErrorCode.DatabaseFailure,
+      'Не удалось включить проверку внешних ключей — целостность связей ' +
+        'между таблицами не гарантируется',
       error,
     );
   }
@@ -159,33 +186,35 @@ export async function withTransaction<T>(
 async function ensureMigrationsTable(db: DB): Promise<void> {
   await db.execute(
     `CREATE TABLE IF NOT EXISTS schema_migrations (
-       id         INTEGER PRIMARY KEY,
-       name       TEXT    NOT NULL,
-       applied_at TEXT    NOT NULL
+       version    INTEGER PRIMARY KEY,
+       applied_at TEXT NOT NULL
      )`,
   );
 }
 
-async function appliedMigrationIds(db: DB): Promise<ReadonlySet<number>> {
-  const result = await db.execute('SELECT id FROM schema_migrations');
-  const ids = new Set<number>();
+async function appliedVersions(db: DB): Promise<ReadonlySet<number>> {
+  const result = await db.execute('SELECT version FROM schema_migrations');
+  const versions = new Set<number>();
 
   for (const row of result.rows) {
-    const id = row.id;
-    if (typeof id === 'number') {
-      ids.add(id);
+    const version = row.version;
+    if (typeof version === 'number') {
+      versions.add(version);
     }
   }
 
-  return ids;
+  return versions;
 }
 
 /**
- * Применяет непринятые миграции по возрастанию `id`.
+ * Применяет миграции с номером выше текущей версии схемы.
+ *
+ * Идемпотентна: повторный вызов, когда всё применено, не делает ничего.
  *
  * Каждая миграция выполняется в собственной транзакции вместе с записью
- * о её применении: если она упадёт на середине, в БД не останется
- * наполовину применённой схемы, помеченной как выполненная.
+ * о применении. Поэтому упавшая на середине миграция откатывается
+ * целиком и не помечается применённой, а уже прошедшие остаются — при
+ * следующем запуске работа продолжится с места остановки.
  *
  * Вызывать один раз при старте приложения, до первого обращения к данным.
  */
@@ -193,11 +222,18 @@ export async function runMigrations(): Promise<void> {
   const db = await getDb();
 
   await ensureMigrationsTable(db);
-  const applied = await appliedMigrationIds(db);
 
-  const pending = [...MIGRATIONS]
-    .filter((migration) => !applied.has(migration.id))
-    .sort((a, b) => a.id - b.id);
+  let pending: readonly Migration[];
+
+  try {
+    pending = selectPendingMigrations(MIGRATIONS, await appliedVersions(db));
+  } catch (error) {
+    throw new StorageError(
+      StorageErrorCode.DatabaseFailure,
+      error instanceof Error ? error.message : 'Не удалось определить ' +
+        'список миграций к применению',
+    );
+  }
 
   for (const migration of pending) {
     try {
@@ -207,14 +243,14 @@ export async function runMigrations(): Promise<void> {
         }
 
         await tx.execute(
-          'INSERT INTO schema_migrations (id, name, applied_at) VALUES (?, ?, ?)',
-          [migration.id, migration.name, new Date().toISOString()],
+          'INSERT INTO schema_migrations (version, applied_at) VALUES (?, ?)',
+          [migration.version, new Date().toISOString()],
         );
       });
     } catch (error) {
       throw new StorageError(
         StorageErrorCode.DatabaseFailure,
-        `Миграция ${migration.id} (${migration.name}) не применилась`,
+        `Миграция ${migration.version} (${migration.name}) не применилась`,
         error,
       );
     }
