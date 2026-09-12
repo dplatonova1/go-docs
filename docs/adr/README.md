@@ -16,6 +16,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0007](./0007-privacy-policy-gate-for-cloud-sync.md) | Privacy policy — обязательное условие перед запуском облачной синхронизации | Accepted (вступает в силу в Фазе 6) |
 | [0008](./0008-known-risk-keychain-decryption-failures.md) | Известный риск react-native-keychain (сбои расшифровки на Android) + обязательные митигации к Фазе 1 | Accepted |
 | [0009](./0009-minimal-android-permissions.md) | Минимальный набор разрешений в release-манифесте, контроль при каждой новой зависимости | Accepted |
+| [0010](./0010-shared-document-library.md) | Документы — общая библиотека пользователя, many-to-many с пунктами чек-листа | Accepted |
 
 ## Когда заводить новый ADR
 
