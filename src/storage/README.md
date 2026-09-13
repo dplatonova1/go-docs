@@ -11,6 +11,7 @@
 | [`crypto.ts`](./crypto.ts) | AES-256-GCM поверх `@noble/ciphers`; формат конверта |
 | [`sandbox.ts`](./sandbox.ts) | Сырой доступ к песочнице **без шифрования** и проверка путей |
 | [`base64.ts`](./base64.ts) | Кодирование base64 для нативного слоя (в React Native нет ни `btoa`, ни `Buffer`) |
+| [`utf8.ts`](./utf8.ts) | Строгое декодирование UTF-8 (в Hermes нет `TextDecoder`, хотя в jest он есть) |
 | [`errors.ts`](./errors.ts) | `StorageError` с кодом-дискриминантом |
 
 ## Главное правило

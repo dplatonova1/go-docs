@@ -15,10 +15,13 @@ import {
   type TextInputProps,
 } from 'react-native';
 
-type TextFieldProps = Omit<
-  TextInputProps,
-  'accessibilityLabel' | 'testID'
-> & {
+import {
+  type ThemeColors,
+  useThemeColors,
+  useThemedStyles,
+} from '../theme/colors';
+
+type TextFieldProps = Omit<TextInputProps, 'accessibilityLabel' | 'testID'> & {
   /** Видимая подпись над полем. */
   label: string;
   /**
@@ -40,16 +43,26 @@ export function TextField({
   style,
   ...rest
 }: TextFieldProps) {
+  const colors = useThemeColors();
+  const themed = useThemedStyles(createThemedStyles);
   const hasError = error !== undefined && error.length > 0;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, themed.text]}>{label}</Text>
 
       <TextInput
         accessibilityLabel={accessibilityLabel}
         testID={testID}
-        style={[styles.input, hasError && styles.inputError, style]}
+        style={[
+          styles.input,
+          themed.input,
+          hasError && styles.inputError,
+          hasError && themed.inputError,
+          style,
+        ]}
+        // До `rest`, чтобы экран мог задать свой цвет плейсхолдера.
+        placeholderTextColor={colors.textSecondary}
         {...rest}
       />
 
@@ -62,7 +75,7 @@ export function TextField({
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
           testID={`${testID}-error`}
-          style={styles.error}
+          style={[styles.error, themed.error]}
         >
           {error}
         </Text>
@@ -94,3 +107,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 });
+
+function createThemedStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    text: {
+      color: colors.text,
+    },
+    input: {
+      color: colors.text,
+      borderColor: colors.border,
+    },
+    inputError: {
+      borderColor: colors.danger,
+    },
+    error: {
+      color: colors.danger,
+    },
+  });
+}

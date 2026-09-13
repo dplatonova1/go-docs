@@ -21,6 +21,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { type ThemeColors, useThemedStyles } from '../theme/colors';
+
 type ButtonProps = Omit<
   PressableProps,
   'accessibilityLabel' | 'accessibilityRole' | 'children' | 'style' | 'testID'
@@ -45,6 +47,7 @@ export function Button({
   style,
   ...rest
 }: ButtonProps) {
+  const themed = useThemedStyles(createThemedStyles);
   const isDisabled = disabled === true;
 
   return (
@@ -58,13 +61,14 @@ export function Button({
       disabled={isDisabled}
       style={({ pressed }) => [
         styles.base,
+        themed.base,
         pressed && styles.pressed,
         isDisabled && styles.disabled,
         style,
       ]}
       {...rest}
     >
-      <Text style={styles.label}>{label}</Text>
+      <Text style={[styles.label, themed.label]}>{label}</Text>
     </Pressable>
   );
 }
@@ -95,3 +99,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+function createThemedStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    base: {
+      borderColor: colors.border,
+    },
+    label: {
+      color: colors.text,
+    },
+  });
+}

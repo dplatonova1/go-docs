@@ -20,13 +20,14 @@ declare const crypto: {
 };
 
 /**
- * Hermes предоставляет `TextEncoder`/`TextDecoder`, как и Node в тестах,
- * но в типах React Native их нет, а `lib.dom` мы не подключаем.
+ * Hermes предоставляет `TextEncoder`, но в типах React Native его нет, а
+ * `lib.dom` мы не подключаем.
+ *
+ * `TextDecoder` здесь не объявлен намеренно: в Hermes его нет, и вызов
+ * падает на устройстве с `ReferenceError`. Node в jest его даёт, поэтому
+ * тесты такое не ловят — ловит только tsc, пока объявления нет.
+ * Декодирование UTF-8 — `bytesToUtf8` из `src/storage/utf8.ts`.
  */
 declare class TextEncoder {
   encode(input?: string): Uint8Array;
-}
-
-declare class TextDecoder {
-  decode(input?: ArrayBufferView | ArrayBuffer): string;
 }

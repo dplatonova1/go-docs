@@ -3,7 +3,7 @@
  *
  * Берёт на себя то, что иначе повторяется на каждом экране и о чём легко
  * забыть: безопасные зоны (вырез камеры, скруглённые углы, индикатор
- * жестов) и подъём содержимого над клавиатурой.
+ * жестов), фон под текущую тему и подъём содержимого над клавиатурой.
  *
  * Клавиатура вынесена сюда не для красоты: полей ручного ввода в этом
  * приложении будет много — каждое автозаполненное поле пользователь
@@ -21,6 +21,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { type ThemeColors, useThemedStyles } from '../theme/colors';
+
 type ScreenProps = {
   children: ReactNode;
   /**
@@ -35,6 +37,8 @@ type ScreenProps = {
 };
 
 export function Screen({ children, scrollable = true, testID }: ScreenProps) {
+  const themed = useThemedStyles(createThemedStyles);
+
   const content = scrollable ? (
     <ScrollView
       style={styles.flex}
@@ -50,7 +54,9 @@ export function Screen({ children, scrollable = true, testID }: ScreenProps) {
   );
 
   return (
-    <SafeAreaView style={styles.flex} testID={testID}>
+    // Фон задаётся явно: фон окна Android в тёмной теме тёмно-серый и не
+    // совпадает с палитрой, а на iOS окно по умолчанию вообще прозрачное.
+    <SafeAreaView style={[styles.flex, themed.background]} testID={testID}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -70,3 +76,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
 });
+
+function createThemedStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    background: {
+      backgroundColor: colors.background,
+    },
+  });
+}

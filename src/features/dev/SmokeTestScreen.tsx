@@ -28,6 +28,8 @@ import {
   writeFile,
 } from '../../storage/fs';
 import { getOrCreateEncryptionKey } from '../../storage/keychain';
+import { bytesToUtf8 } from '../../storage/utf8';
+import { type ThemeColors, useThemedStyles } from '../../theme/colors';
 
 const TEST_FILE = toRelativePath('dev/smoke-test.txt');
 
@@ -72,12 +74,15 @@ function fingerprint(key: string): string {
 }
 
 function ResultView({ result }: { result: CheckResult }) {
+  // До раннего return: порядок хуков не должен зависеть от статуса.
+  const themed = useThemedStyles(createThemedStyles);
+
   if (result.status === 'idle') {
     return null;
   }
 
   if (result.status === 'running') {
-    return <Text style={styles.pending}>выполняется…</Text>;
+    return <Text style={[styles.pending, themed.secondary]}>выполняется…</Text>;
   }
 
   const prefix = result.status === 'ok' ? 'OK —' : 'ОШИБКА —';
@@ -87,7 +92,11 @@ function ResultView({ result }: { result: CheckResult }) {
       {result.lines.map((line, index) => (
         <Text
           key={`${index}-${line}`}
-          style={result.status === 'ok' ? styles.ok : styles.fail}
+          style={
+            result.status === 'ok'
+              ? [styles.ok, themed.text]
+              : [styles.fail, themed.danger]
+          }
         >
           {index === 0 ? `${prefix} ${line}` : line}
         </Text>
@@ -120,7 +129,7 @@ export function SmokeTestScreen() {
     ): void => {
       setter({ status: 'running' });
       action()
-        .then((lines) => setter({ status: 'ok', lines }))
+        .then(lines => setter({ status: 'ok', lines }))
         .catch((error: unknown) =>
           setter({ status: 'fail', lines: describeError(error) }),
         );
@@ -180,7 +189,7 @@ export function SmokeTestScreen() {
 
   const onReadFile = useCallback(() => {
     run(setFileResult, async () => {
-      const text = new TextDecoder().decode(await readFile(TEST_FILE));
+      const text = bytesToUtf8(await readFile(TEST_FILE));
 
       if (written !== undefined && text !== written) {
         throw new Error(
@@ -236,10 +245,10 @@ export function SmokeTestScreen() {
       const result = await db.execute(LIST_TABLES_SQL);
 
       const names = result.rows
-        .map((row) => row.name)
+        .map(row => row.name)
         .filter((name): name is string => typeof name === 'string');
 
-      const missing = EXPECTED_TABLES.filter((table) => !names.includes(table));
+      const missing = EXPECTED_TABLES.filter(table => !names.includes(table));
 
       if (missing.length > 0) {
         throw new Error(`Не хватает таблиц: ${missing.join(', ')}`);
@@ -247,20 +256,22 @@ export function SmokeTestScreen() {
 
       return [
         `таблиц найдено: ${names.length}, все пять ожидаемых на месте`,
-        ...names.map((name) => `• ${name}`),
+        ...names.map(name => `• ${name}`),
       ];
     });
   }, [run]);
+  const themed = useThemedStyles(createThemedStyles);
 
+  console.log('smoke screen');
   return (
     <Screen testID="smoke-test-screen">
-      <Text style={styles.title}>Проверка на устройстве</Text>
-      <Text style={styles.note}>
+      <Text style={[styles.title, themed.text]}>Проверка на устройстве</Text>
+      <Text style={[styles.note, themed.secondary]}>
         Временный экран Фазы 0. Удаляется перед Фазой 1.
       </Text>
 
-      <View style={styles.block}>
-        <Text style={styles.heading}>1. Ключ шифрования</Text>
+      <View style={[styles.block, themed.block]}>
+        <Text style={[styles.heading, themed.text]}>1. Ключ шифрования</Text>
         <Button
           label="Записать ключ"
           accessibilityLabel="Получить или создать ключ шифрования"
@@ -276,8 +287,8 @@ export function SmokeTestScreen() {
         <ResultView result={keyResult} />
       </View>
 
-      <View style={styles.block}>
-        <Text style={styles.heading}>
+      <View style={[styles.block, themed.block]}>
+        <Text style={[styles.heading, themed.text]}>
           2. Файлы (через fs.ts, с шифрованием)
         </Text>
         <Button
@@ -301,8 +312,8 @@ export function SmokeTestScreen() {
         <ResultView result={fileResult} />
       </View>
 
-      <View style={styles.block}>
-        <Text style={styles.heading}>3. База данных</Text>
+      <View style={[styles.block, themed.block]}>
+        <Text style={[styles.heading, themed.text]}>3. База данных</Text>
         <Button
           label="Показать список таблиц БД"
           accessibilityLabel="Применить миграции и показать список таблиц"
@@ -348,3 +359,20 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
+function createThemedStyles(colors: ThemeColors) {
+  return StyleSheet.create({
+    text: {
+      color: colors.text,
+    },
+    secondary: {
+      color: colors.textSecondary,
+    },
+    danger: {
+      color: colors.danger,
+    },
+    block: {
+      borderTopColor: colors.border,
+    },
+  });
+}
