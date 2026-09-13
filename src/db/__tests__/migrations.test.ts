@@ -82,7 +82,7 @@ describe('MIGRATIONS', () => {
     }
   });
 
-  it('первая миграция создаёт все четыре таблицы Фазы 0', () => {
+  it('первая миграция создаёт все пять таблиц Фазы 0', () => {
     const sql = MIGRATIONS.flatMap((m) => m.statements).join('\n');
 
     for (const table of [

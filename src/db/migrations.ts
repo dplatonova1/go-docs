@@ -52,18 +52,25 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX idx_checklist_items_application_id
          ON checklist_items(application_id)`,
 
-      // личная библиотека документов — НЕ привязана к одной заявке
+      // личная библиотека документов — НЕ привязана к одной заявке,
+      // см. ADR-0010
       `CREATE TABLE documents (
          id TEXT PRIMARY KEY,
          original_filename TEXT,
          file_path TEXT NOT NULL,
          mime_type TEXT,
          size_bytes INTEGER,
-         encrypted INTEGER NOT NULL DEFAULT 1,
          quality_flag TEXT                             -- проставляется в Фазе 2
            CHECK (quality_flag IS NULL OR quality_flag IN ('blurry', 'dark')),
-         created_at TEXT NOT NULL
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL
        )`,
+
+      // Один файл на диске — одна запись. Иначе две записи указывают на
+      // один file_path, и удаление документа по одной из них оставляет
+      // вторую ссылаться на несуществующий файл.
+      `CREATE UNIQUE INDEX idx_documents_file_path
+         ON documents(file_path)`,
 
       // связь many-to-many: один документ закрывает пункты в разных заявках
       `CREATE TABLE checklist_item_documents (
@@ -88,36 +95,6 @@ export const MIGRATIONS: readonly Migration[] = [
          created_at TEXT NOT NULL,
          updated_at TEXT NOT NULL
        )`,
-    ],
-  },
-  {
-    version: 2,
-    name: 'documents_cleanup',
-    statements: [
-      // `encrypted` всегда был 1: после реализации шифрования в fs.ts пути
-      // записи документа без шифрования не существует. Колонка не просто
-      // лишняя — она провоцирует код вида `if (doc.encrypted) decrypt()`,
-      // и единственная нештатная строка со значением 0 привела бы к выдаче
-      // шифротекста вместо документа.
-      `ALTER TABLE documents DROP COLUMN encrypted`,
-
-      // У остальных таблиц updated_at есть, а у documents не было — хотя
-      // записи обновляются: quality_flag проставляется в Фазе 2.
-      //
-      // Добавляется без NOT NULL: SQLite требует для NOT NULL-колонки
-      // непустое значение по умолчанию, а подставлять '' в дату — хуже,
-      // чем NULL. Существующие строки заполняются датой создания.
-      `ALTER TABLE documents ADD COLUMN updated_at TEXT`,
-      `UPDATE documents SET updated_at = created_at WHERE updated_at IS NULL`,
-
-      // Один файл на диске — одна запись. Иначе две записи указывают на
-      // один file_path, и удаление документа по одной из них оставляет
-      // вторую ссылаться на несуществующий файл.
-      //
-      // UNIQUE INDEX, а не UNIQUE-констрейнт: в SQLite нельзя добавить
-      // констрейнт в существующую таблицу, но уникальный индекс даёт
-      // ровно ту же гарантию.
-      `CREATE UNIQUE INDEX idx_documents_file_path ON documents(file_path)`,
     ],
   },
 ];

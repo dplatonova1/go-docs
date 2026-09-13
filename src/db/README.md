@@ -5,13 +5,18 @@
 Единственная точка входа — [`client.ts`](./client.ts). Остальной код не
 должен импортировать `@op-engineering/op-sqlite` напрямую.
 
-Таблицы (Фаза 0): `applications`, `documents`, `checklist_items`,
-`form_templates`.
+Таблицы (Фаза 0): `applications`, `checklist_items`, `documents`,
+`checklist_item_documents`, `form_templates`.
+
+Документы — общая библиотека пользователя, а не вложение в заявку: один
+документ закрывает пункты в разных заявках через связующую таблицу
+`checklist_item_documents` ([ADR-0010](../../docs/adr/0010-shared-document-library.md)).
 
 ## Правила
 
 - Схема меняется только через нумерованные миграции в массиве
-  `MIGRATIONS` в `client.ts`, без «ручных» ALTER в рантайме.
+  `MIGRATIONS` в [`migrations.ts`](./migrations.ts), без «ручных» ALTER
+  в рантайме. `client.ts` — только раннер.
 - Уже применённая миграция никогда не редактируется — на устройствах, где
   она отработала, правка не появится. Вместо этого заводится следующая.
 - Запросы только параметризованные (`execute(sql, params)`), без склейки

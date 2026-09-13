@@ -9,8 +9,10 @@
  * ([ADR-0002](../../docs/adr/0002-local-first-storage.md)). Ключ берётся
  * из Keychain при каждой операции — в модуле он не кэшируется.
  *
- * Содержимое передаётся и возвращается как base64: документы бинарные
- * (сканы, PDF, docx), а мост между JS и нативным слоем строковый.
+ * Содержимое передаётся и возвращается как `Uint8Array`: документы
+ * бинарные (сканы, PDF, docx), и байты — их честный тип. Кодирование в
+ * base64 для нативного слоя остаётся внутри этого модуля, вызывающему
+ * знать о нём не нужно.
  */
 
 import { base64ToBytes, bytesToBase64 } from './base64';
@@ -30,15 +32,14 @@ export { getAppFilesDir, toRelativePath, type RelativePath } from './sandbox';
 /**
  * Шифрует и записывает документ.
  *
- * @param content содержимое файла в base64.
  * @returns тот же относительный путь — его и следует сохранить в БД.
  */
-export async function saveFile(
+export async function writeFile(
   relativePath: RelativePath,
-  content: string,
+  content: Uint8Array,
 ): Promise<RelativePath> {
   const key = await getOrCreateEncryptionKey();
-  const encrypted = encryptBytes(base64ToBytes(content), key);
+  const encrypted = encryptBytes(content, key);
 
   await rawWrite(relativePath, bytesToBase64(encrypted), FileEncoding.Base64);
 
@@ -48,18 +49,18 @@ export async function saveFile(
 /**
  * Читает и расшифровывает документ.
  *
- * @returns содержимое файла в base64 — ровно то, что было передано в
- *   `saveFile`.
+ * @returns содержимое файла — ровно те байты, что были переданы в
+ *   `writeFile`.
  * @throws StorageError `file-not-found`, `file-corrupted` (файл изменён
  *   или ключ не тот), либо ошибки получения ключа из Keychain.
  */
 export async function readFile(
   relativePath: RelativePath,
-): Promise<string> {
+): Promise<Uint8Array> {
   const key = await getOrCreateEncryptionKey();
   const stored = await rawRead(relativePath, FileEncoding.Base64);
 
-  return bytesToBase64(decryptBytes(base64ToBytes(stored), key));
+  return decryptBytes(base64ToBytes(stored), key);
 }
 
 /**

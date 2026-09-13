@@ -20,13 +20,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { getDb, runMigrations } from '../../db/client';
-import { base64ToBytes, bytesToBase64 } from '../../storage/base64';
 import { StorageErrorCode, isStorageError } from '../../storage/errors';
 import {
   deleteFile,
   readFile,
-  saveFile,
   toRelativePath,
+  writeFile,
 } from '../../storage/fs';
 import { getOrCreateEncryptionKey } from '../../storage/keychain';
 
@@ -171,9 +170,8 @@ export function SmokeTestScreen() {
   const onWriteFile = useCallback(() => {
     run(setFileResult, async () => {
       const text = `проверка записи ${new Date().toISOString()}`;
-      const content = bytesToBase64(new TextEncoder().encode(text));
 
-      await saveFile(TEST_FILE, content);
+      await writeFile(TEST_FILE, new TextEncoder().encode(text));
       setWritten(text);
 
       return ['файл записан', `путь: ${TEST_FILE}`, `содержимое: ${text}`];
@@ -182,8 +180,7 @@ export function SmokeTestScreen() {
 
   const onReadFile = useCallback(() => {
     run(setFileResult, async () => {
-      const content = await readFile(TEST_FILE);
-      const text = new TextDecoder().decode(base64ToBytes(content));
+      const text = new TextDecoder().decode(await readFile(TEST_FILE));
 
       if (written !== undefined && text !== written) {
         throw new Error(

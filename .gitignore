@@ -107,3 +107,8 @@ android/app/.cxx/
 .vscode/
 *.swp
 Thumbs.db
+
+# Личный скилл оформления ответов — настройка конкретного разработчика,
+# а не проекта. Остальные скиллы в .claude/skills/ общие и версионируются.
+# Источник: https://github.com/ayghri/i-have-adhd
+.claude/skills/i-have-adhd/
