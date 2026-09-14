@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Фон окна до первого кадра React Native (пока грузится JS).
+      Совпадает с `background` светлой палитры в src/theme/colors.ts —
+      менять вместе, иначе при запуске будет вспышка другого цвета.
+    -->
+    <color name="app_background">#FCFCFC</color>
+</resources>

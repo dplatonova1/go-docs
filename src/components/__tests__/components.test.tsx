@@ -14,6 +14,7 @@ import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { AppThemeProvider } from '../../theme/ThemeProvider';
 import { Button } from '../Button';
 import { Screen } from '../Screen';
 import { TextField } from '../TextField';
@@ -31,7 +32,9 @@ function render(
   let tree!: ReactTestRenderer.ReactTestRenderer;
   ReactTestRenderer.act(() => {
     tree = ReactTestRenderer.create(
-      <SafeAreaProvider>{element}</SafeAreaProvider>,
+      <SafeAreaProvider>
+        <AppThemeProvider>{element}</AppThemeProvider>
+      </SafeAreaProvider>,
     );
   });
   return tree;

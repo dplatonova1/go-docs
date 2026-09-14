@@ -27,8 +27,16 @@
 | [0008](docs/adr/0008-known-risk-keychain-decryption-failures.md) | Известный риск react-native-keychain (сбои расшифровки на Android) + обязательные митигации к Фазе 1 |
 | [0009](docs/adr/0009-minimal-android-permissions.md) | Минимальный набор разрешений в release-манифесте, контроль при каждой новой зависимости |
 | [0010](docs/adr/0010-shared-document-library.md) | Документы — общая библиотека пользователя, many-to-many с пунктами чек-листа |
+| [0011](docs/adr/0011-styled-components.md) | Стили компонентов — styled-components, тема через `ThemeProvider` |
 
 Полный список и правила ведения ADR — в [docs/adr/README.md](docs/adr/README.md).
+
+## Конвенции кода
+
+Структура папки компонента (`Component.tsx`, `types.ts`, `styles.ts`,
+`constants.ts`, `index.ts`), a11y и конвенции React Native — в
+[src/components/README.md](src/components/README.md). Действуют и для
+компонентов внутри `src/features`.
 
 ## Отложенные обязательства
 
@@ -40,10 +48,12 @@ security-аудита 2026-09-07. Проверить перед началом �
 **Перед Фазой 1:**
 
 - **Удалить временный код проверки.** Помечен `TODO: remove before Phase 1`
-  в трёх местах: [src/features/dev/](src/features/dev/) целиком,
+  в четырёх местах: [src/features/dev/](src/features/dev/) целиком,
   подключение экрана в [App.tsx](App.tsx) (там же закомментирован
-  запасной экран) и заглушки нативных модулей в
-  [__tests__/App.test.tsx](__tests__/App.test.tsx).
+  запасной экран), заглушки нативных модулей в
+  [__tests__/App.test.tsx](__tests__/App.test.tsx) и `useThemedStyles` в
+  [src/theme/colors.ts](src/theme/colors.ts) — старый способ стилей,
+  которым пользуется только временный экран.
 
 - **Предупреждение при удалении документа ([ADR-0010](docs/adr/0010-shared-document-library.md)).**
   `ON DELETE CASCADE` на `document_id` означает, что удаление документа из

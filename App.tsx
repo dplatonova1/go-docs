@@ -15,6 +15,7 @@ import { StatusBar, useColorScheme } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SmokeTestScreen } from './src/features/dev/SmokeTestScreen';
+import { AppThemeProvider } from './src/theme/ThemeProvider';
 
 // --- Запасной экран из шаблона React Native ---------------------------
 //
@@ -56,8 +57,10 @@ function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <SmokeTestScreen />
+      <AppThemeProvider>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
+        <SmokeTestScreen />
+      </AppThemeProvider>
     </SafeAreaProvider>
   );
 }
