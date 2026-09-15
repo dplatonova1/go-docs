@@ -20,6 +20,7 @@ export function Button({
   accessibilityLabel,
   testID,
   disabled,
+  variant = 'primary',
   style,
   ...rest
 }: ButtonProps) {
@@ -35,14 +36,11 @@ export function Button({
       testID={testID}
       disabled={isDisabled}
       $disabled={isDisabled}
-      style={({ pressed }) => [
-        containerShadow,
-        pressed && pressedStyle,
-        style,
-      ]}
+      $variant={variant}
+      style={({ pressed }) => [containerShadow, pressed && pressedStyle, style]}
       {...rest}
     >
-      <Label>{label}</Label>
+      <Label $variant={variant}>{label}</Label>
     </Container>
   );
 }

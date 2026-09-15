@@ -1,5 +1,13 @@
 import type { PressableProps, StyleProp, ViewStyle } from 'react-native';
 
+/**
+ * Назначение кнопки:
+ * - `primary` — основное действие экрана;
+ * - `secondary` — вспомогательное (добавить, переставить);
+ * - `danger` — необратимое или удаляющее.
+ */
+export type ButtonVariant = 'primary' | 'secondary' | 'danger';
+
 export type ButtonProps = Omit<
   PressableProps,
   'accessibilityLabel' | 'accessibilityRole' | 'children' | 'style' | 'testID'
@@ -13,10 +21,18 @@ export type ButtonProps = Omit<
    */
   accessibilityLabel: string;
   testID: string;
+  /** По умолчанию `primary`. */
+  variant?: ButtonVariant;
   style?: StyleProp<ViewStyle>;
 };
 
 /** Пропсы оформления контейнера, см. `styles.ts`. */
 export type ContainerStyleProps = {
   $disabled: boolean;
+  $variant: ButtonVariant;
+};
+
+/** Пропсы оформления надписи, см. `styles.ts`. */
+export type LabelStyleProps = {
+  $variant: ButtonVariant;
 };

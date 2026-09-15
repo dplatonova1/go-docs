@@ -45,6 +45,12 @@ export const StorageErrorCode = {
    * сборка их формат не понимает.
    */
   FileFormatUnsupported: 'file-format-unsupported',
+  /**
+   * Файл больше допустимого размера. Предел задаёт вызывающий код: весь
+   * файл читается в память для шифрования, и большой скан на слабом
+   * телефоне уронил бы приложение по памяти.
+   */
+  FileTooLarge: 'file-too-large',
   /** Сбой операции с БД. */
   DatabaseFailure: 'database-failure',
 } as const;

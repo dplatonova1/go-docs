@@ -18,6 +18,7 @@ export function TextField({
   accessibilityLabel,
   testID,
   error,
+  minLines = 1,
   ...rest
 }: TextFieldProps) {
   const theme = useTheme();
@@ -31,6 +32,8 @@ export function TextField({
         accessibilityLabel={accessibilityLabel}
         testID={testID}
         $hasError={hasError}
+        $multiline={rest.multiline === true}
+        $minLines={minLines}
         // До `rest`, чтобы экран мог задать свой цвет плейсхолдера.
         placeholderTextColor={theme.colors.textSecondary}
         {...rest}

@@ -1,16 +1,13 @@
 /**
  * @format
  *
- * Smoke-тест корневого компонента: проверяет, что дерево собирается и
- * ничего не падает на импортах.
+ * Smoke-тест корневого компонента: дерево собирается, провайдеры на
+ * месте, и без заявки запуск приводит на экран её создания.
  *
- * Нативные обёртки заменены заглушками на нашей границе (db/client,
- * storage/keychain, storage/fs), а не на уровне библиотек: тесту важно,
- * что экран рендерится, а работа хранилища проверяется своими тестами и
- * вручную на устройстве.
- *
- * TODO: remove before Phase 1 — вместе с временным экраном
- * src/features/dev отсюда уйдут и эти заглушки.
+ * Хранилище заменено заглушками на нашей границе (db/client и
+ * репозиторий), а не на уровне нативных библиотек: работа хранилища
+ * проверяется своими тестами и вручную на устройстве. Развилки запуска
+ * подробно — в src/navigation/__tests__/RootNavigator.test.tsx.
  */
 
 import React from 'react';
@@ -24,25 +21,28 @@ jest.mock('react-native-safe-area-context', () => {
 });
 
 jest.mock('../src/db/client', () => ({
-  getDb: jest.fn(),
-  runMigrations: jest.fn(),
+  runMigrations: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../src/storage/keychain', () => ({
-  getOrCreateEncryptionKey: jest.fn(),
+jest.mock('../src/features/checklist/repository', () => ({
+  getActiveApplication: jest.fn().mockResolvedValue(null),
+  listChecklistItems: jest.fn(),
+  createApplication: jest.fn(),
 }));
 
-jest.mock('../src/storage/fs', () => ({
-  // toRelativePath вызывается на уровне модуля, поэтому заглушка обязана
-  // вернуть строку, а не undefined.
-  toRelativePath: (value: string) => value,
-  saveFile: jest.fn(),
-  readFile: jest.fn(),
-  deleteFile: jest.fn(),
+jest.mock('../src/features/checklist/attachDocument', () => ({
+  pickAndAttachDocument: jest.fn(),
 }));
 
-test('renders correctly', async () => {
-  await ReactTestRenderer.act(() => {
-    ReactTestRenderer.create(<App />);
+test('без заявки открывает экран создания', async () => {
+  let tree!: ReactTestRenderer.ReactTestRenderer;
+
+  await ReactTestRenderer.act(async () => {
+    tree = ReactTestRenderer.create(<App />);
   });
+
+  expect(
+    tree.root.findAll(node => node.props.testID === 'create-application-screen')
+      .length,
+  ).toBeGreaterThan(0);
 });

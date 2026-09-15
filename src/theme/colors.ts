@@ -19,7 +19,6 @@
  * `accent`, `input`, `ring`: для них в приложении нет элементов.
  */
 
-import { useMemo } from 'react';
 import { useColorScheme } from 'react-native';
 
 export type ThemeColors = {
@@ -104,22 +103,4 @@ export const darkColors: ThemeColors = {
  */
 export function useThemeColors(): ThemeColors {
   return useColorScheme() === 'dark' ? darkColors : lightColors;
-}
-
-/**
- * Стили, зависящие от темы, для `StyleSheet.create`.
- *
- * TODO: remove before Phase 1 — старый способ. Стили компонентов пишутся
- * на styled-components и берут цвета из темы (ADR-0011). Этой функцией
- * пользуется только временный `SmokeTestScreen`, удаляется вместе с ним.
- *
- * Цветовые стили собираются фабрикой и пересоздаются только при смене
- * темы.
- *
- * `create` должна быть объявлена на уровне модуля, а не внутри
- * компонента: иначе она новая на каждый рендер и `useMemo` бесполезен.
- */
-export function useThemedStyles<T>(create: (colors: ThemeColors) => T): T {
-  const colors = useThemeColors();
-  return useMemo(() => create(colors), [create, colors]);
 }
