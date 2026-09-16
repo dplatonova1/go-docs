@@ -1,4 +1,9 @@
-import type { ChecklistItem, ChecklistItemId } from '../model';
+import type {
+  AttachedDocument,
+  ChecklistItem,
+  ChecklistItemId,
+  DocumentId,
+} from '../model';
 
 export type ChecklistItemRowProps = {
   item: ChecklistItem;
@@ -7,14 +12,17 @@ export type ChecklistItemRowProps = {
   total: number;
   /** Идёт прикрепление файла именно к этому пункту. */
   isAttaching: boolean;
+  /** Идёт удаление именно этого файла. */
+  deletingDocumentId: DocumentId | null;
   /**
-   * Кнопка прикрепления недоступна: прикрепление к какому-то пункту уже
-   * идёт (системный пикер — один на приложение) или заявку сбрасывают.
+   * Кнопки пункта недоступны: с каким-то пунктом уже идёт работа
+   * (системный пикер — один на приложение) или заявку сбрасывают.
    */
-  attachDisabled: boolean;
-  /** Сообщение о неудачном прикреплении к этому пункту. */
-  attachError: string | null;
+  actionsDisabled: boolean;
+  /** Сообщение о неудачном прикреплении или удалении в этом пункте. */
+  actionError: string | null;
   onAttach: (itemId: ChecklistItemId) => void;
+  onDeleteFile: (itemId: ChecklistItemId, document: AttachedDocument) => void;
 };
 
 /** Пропсы оформления плашки статуса, см. `styles.ts`. */

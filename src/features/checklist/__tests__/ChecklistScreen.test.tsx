@@ -33,8 +33,13 @@ jest.mock('../attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
 }));
 
+jest.mock('../detachDocument', () => ({
+  deleteAttachedDocument: jest.fn(),
+}));
+
 const repository = require('../repository');
 const attach = require('../attachDocument');
+const detach = require('../detachDocument');
 
 const APPLICATION = { id: 'app-1' as ApplicationId, title: 'ВНЖ Сербия' };
 
@@ -312,7 +317,7 @@ describe('прикрепление файла', () => {
     expect(
       findByTestId(tree, 'checklist-item-0-status').props.accessibilityLabel,
     ).toBe('Пункт 1: не прикреплено');
-    expect(exists(tree, 'checklist-item-0-attach-error')).toBe(false);
+    expect(exists(tree, 'checklist-item-0-error')).toBe(false);
   });
 
   it('ошибка показывается у своего пункта, кнопка снова доступна', async () => {
@@ -323,8 +328,8 @@ describe('прикрепление файла', () => {
 
     await press(tree, 'checklist-item-1-attach');
 
-    expect(exists(tree, 'checklist-item-1-attach-error')).toBe(true);
-    expect(exists(tree, 'checklist-item-0-attach-error')).toBe(false);
+    expect(exists(tree, 'checklist-item-1-error')).toBe(true);
+    expect(exists(tree, 'checklist-item-0-error')).toBe(false);
     expect(findByTestId(tree, 'checklist-item-1-attach').props.disabled).toBe(
       false,
     );
@@ -357,6 +362,140 @@ describe('прикрепление файла', () => {
 
     await ReactTestRenderer.act(async () => {
       finish({ status: 'canceled' });
+    });
+  });
+});
+
+describe('удаление прикреплённого файла', () => {
+  const DOCUMENT = { id: 'd1', name: 'Паспорт.pdf' };
+
+  beforeEach(() => {
+    repository.listChecklistItems.mockResolvedValue([
+      {
+        id: 'i1',
+        label: 'Паспорт',
+        position: 0,
+        status: 'attached',
+        documents: [DOCUMENT],
+      },
+      {
+        id: 'i2',
+        label: 'Фото',
+        position: 1,
+        status: 'pending',
+        documents: [],
+      },
+    ]);
+    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function lastAlertButtons(): AlertButton[] {
+    const calls = (Alert.alert as jest.Mock).mock.calls;
+    return (calls[calls.length - 1]?.[2] ?? []) as AlertButton[];
+  }
+
+  async function confirmDeletion() {
+    const confirm = lastAlertButtons().find(b => b.style === 'destructive');
+    await ReactTestRenderer.act(async () => {
+      confirm?.onPress?.();
+    });
+    await flush();
+  }
+
+  it('у каждого файла своя кнопка удаления с именем файла в подписи', async () => {
+    const tree = await renderScreen();
+
+    const button = findByTestId(tree, 'checklist-item-0-file-0-delete');
+    expect(button.props.accessibilityLabel).toBe(
+      'Удалить файл Паспорт.pdf из пункта 1: Паспорт',
+    );
+    expect(button.props.label).toBe('Удалить');
+    expect(interactiveWithoutA11y(tree)).toEqual([]);
+  });
+
+  it('диалог говорит об удалении без восстановления и ничего не удаляет сразу', async () => {
+    const tree = await renderScreen();
+
+    await press(tree, 'checklist-item-0-file-0-delete');
+
+    const [title, message] = (Alert.alert as jest.Mock).mock.calls[0] ?? [];
+    expect(title).toBe('Удалить файл «Паспорт.pdf»?');
+    expect(message).toContain('удалён без возможности восстановления');
+    expect(String(message).toLowerCase()).not.toContain('открепить');
+    expect(lastAlertButtons()[0]?.style).toBe('cancel');
+    expect(detach.deleteAttachedDocument).not.toHaveBeenCalled();
+  });
+
+  it('после подтверждения файл пропадает, пункт снова не прикреплён', async () => {
+    detach.deleteAttachedDocument.mockResolvedValue(undefined);
+    const tree = await renderScreen();
+
+    await press(tree, 'checklist-item-0-file-0-delete');
+    await confirmDeletion();
+
+    expect(detach.deleteAttachedDocument).toHaveBeenCalledWith('i1', 'd1');
+    expect(exists(tree, 'checklist-item-0-file-0')).toBe(false);
+    expect(
+      findByTestId(tree, 'checklist-item-0-status').props.accessibilityLabel,
+    ).toBe('Пункт 1: не прикреплено');
+  });
+
+  it('отмена в диалоге ничего не удаляет', async () => {
+    const tree = await renderScreen();
+
+    await press(tree, 'checklist-item-0-file-0-delete');
+
+    expect(detach.deleteAttachedDocument).not.toHaveBeenCalled();
+    expect(exists(tree, 'checklist-item-0-file-0')).toBe(true);
+  });
+
+  it('ошибка удаления показывается у пункта, файл остаётся на экране', async () => {
+    detach.deleteAttachedDocument.mockRejectedValue(
+      new StorageError(StorageErrorCode.DatabaseFailure, 'детали'),
+    );
+    const tree = await renderScreen();
+
+    await press(tree, 'checklist-item-0-file-0-delete');
+    await confirmDeletion();
+
+    expect(exists(tree, 'checklist-item-0-error')).toBe(true);
+    expect(exists(tree, 'checklist-item-0-file-0')).toBe(true);
+    expect(
+      findByTestId(tree, 'checklist-item-0-status').props.accessibilityLabel,
+    ).toBe('Пункт 1: прикреплено');
+  });
+
+  it('во время удаления остальные действия недоступны', async () => {
+    let finish: (value: unknown) => void = () => {};
+    detach.deleteAttachedDocument.mockImplementation(
+      () => new Promise(resolve => (finish = resolve)),
+    );
+    const tree = await renderScreen();
+
+    await press(tree, 'checklist-item-0-file-0-delete');
+    const confirm = lastAlertButtons().find(b => b.style === 'destructive');
+    await ReactTestRenderer.act(async () => {
+      confirm?.onPress?.();
+      confirm?.onPress?.();
+    });
+
+    expect(detach.deleteAttachedDocument).toHaveBeenCalledTimes(1);
+    expect(
+      findByTestId(tree, 'checklist-item-0-file-0-delete').props.label,
+    ).toBe('Удаление…');
+    expect(findByTestId(tree, 'checklist-item-1-attach').props.disabled).toBe(
+      true,
+    );
+    expect(findByTestId(tree, 'reset-application-button').props.disabled).toBe(
+      true,
+    );
+
+    await ReactTestRenderer.act(async () => {
+      finish(undefined);
     });
   });
 });

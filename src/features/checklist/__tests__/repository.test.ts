@@ -24,6 +24,7 @@ import type {
 import {
   attachDocumentToItem,
   createApplication,
+  detachDocumentFromItem,
   getActiveApplication,
   listChecklistItems,
 } from '../repository';
@@ -312,6 +313,104 @@ describe('attachDocumentToItem', () => {
       new Error('FOREIGN KEY constraint failed'),
     );
     const error = await failureOf(() => attachDocumentToItem(ATTACHMENT));
+    expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
+  });
+});
+
+describe('detachDocumentFromItem', () => {
+  const ITEM_ID = 'item-1' as ChecklistItemId;
+  const DOCUMENT_ID = 'doc-1' as DocumentId;
+
+  /**
+   * Транзакция удаления. `otherLinks` — остались ли у документа связи с
+   * другими пунктами, `remainingOfItem` — остались ли файлы у пункта.
+   */
+  function mockDetachTransaction(options: {
+    path?: Rows;
+    otherLinks?: Rows;
+    remainingOfItem?: Rows;
+  }) {
+    const tx = {
+      execute: jest.fn<Promise<{ rows: Rows }>, [string, unknown[]?]>(
+        async sql => {
+          if (sql.startsWith('SELECT file_path')) {
+            return { rows: options.path ?? [{ file_path: 'documents/doc-1' }] };
+          }
+          if (sql.includes('WHERE document_id = ?')) {
+            return { rows: options.otherLinks ?? [] };
+          }
+          if (sql.includes('WHERE checklist_item_id = ?')) {
+            return { rows: options.remainingOfItem ?? [] };
+          }
+          return { rows: [] };
+        },
+      ),
+    };
+    client.withTransaction.mockImplementation(
+      async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx),
+    );
+    return tx;
+  }
+
+  it('связь, документ и статус пункта — одной транзакцией; путь файла наружу', async () => {
+    const tx = mockDetachTransaction({});
+
+    await expect(detachDocumentFromItem(ITEM_ID, DOCUMENT_ID)).resolves.toBe(
+      'documents/doc-1',
+    );
+
+    expect(client.withTransaction).toHaveBeenCalledTimes(1);
+    const calls = tx.execute.mock.calls;
+    expect(calls.map(([sql]) => sql.split(' ').slice(0, 3).join(' '))).toEqual([
+      'SELECT file_path FROM',
+      'DELETE FROM checklist_item_documents',
+      'SELECT 1 FROM',
+      'DELETE FROM documents',
+      'SELECT 1 FROM',
+      'UPDATE checklist_items SET',
+    ]);
+    expect(calls[1]?.[1]).toEqual([ITEM_ID, DOCUMENT_ID]);
+    expect(calls[3]?.[1]).toEqual([DOCUMENT_ID]);
+    expect(calls[5]?.[1]).toEqual([expect.any(String), ITEM_ID]);
+  });
+
+  it('документ прикреплён к другому пункту — не удаляется, файл остаётся', async () => {
+    const tx = mockDetachTransaction({ otherLinks: [{ 1: 1 }] });
+
+    await expect(
+      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
+    ).resolves.toBeNull();
+
+    const statements = tx.execute.mock.calls.map(([sql]) => sql);
+    expect(
+      statements.some(sql => sql.startsWith('DELETE FROM documents')),
+    ).toBe(false);
+  });
+
+  it('у пункта остались файлы — статус не понижается', async () => {
+    const tx = mockDetachTransaction({ remainingOfItem: [{ 1: 1 }] });
+
+    await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID);
+
+    const statements = tx.execute.mock.calls.map(([sql]) => sql);
+    expect(
+      statements.some(sql => sql.startsWith('UPDATE checklist_items')),
+    ).toBe(false);
+  });
+
+  it('записи документа уже нет — связь всё равно снимается, файла нет', async () => {
+    mockDetachTransaction({ path: [] });
+
+    await expect(
+      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
+    ).resolves.toBeNull();
+  });
+
+  it('сбой транзакции — StorageError', async () => {
+    client.withTransaction.mockRejectedValue(new Error('SQLITE_BUSY'));
+    const error = await failureOf(() =>
+      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
+    );
     expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
   });
 });

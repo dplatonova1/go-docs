@@ -34,6 +34,10 @@ jest.mock('../src/features/checklist/attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
 }));
 
+jest.mock('../src/features/checklist/detachDocument', () => ({
+  deleteAttachedDocument: jest.fn(),
+}));
+
 test('без заявки открывает экран создания', async () => {
   let tree!: ReactTestRenderer.ReactTestRenderer;
 

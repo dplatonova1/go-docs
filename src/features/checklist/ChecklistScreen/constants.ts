@@ -1,8 +1,10 @@
-import type { AttachState, ItemsState, ResetState } from './types';
+import type { AttachState, DeleteState, ItemsState, ResetState } from './types';
 
 export const LOADING: ItemsState = { status: 'loading' };
 
 export const ATTACH_IDLE: AttachState = { status: 'idle' };
+
+export const DELETE_IDLE: DeleteState = { status: 'idle' };
 
 export const RESET_IDLE: ResetState = { status: 'idle' };
 

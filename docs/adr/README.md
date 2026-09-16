@@ -19,6 +19,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0010](./0010-shared-document-library.md) | Документы — общая библиотека пользователя, many-to-many с пунктами чек-листа | Accepted |
 | [0011](./0011-styled-components.md) | Стили компонентов — styled-components, тема через `ThemeProvider` | Accepted |
 | [0012](./0012-delete-orphan-documents-with-application.md) | Удаление заявки удаляет документы, которые больше ни к чему не прикреплены (с подтверждением) | Accepted |
+| [0013](./0013-detach-deletes-document-in-phase-1.md) | Открепление файла в Фазе 1 — полное удаление документа, а не снятие связи | Accepted (временно, заменяется в Фазе 2) |
 
 ## Когда заводить новый ADR
 

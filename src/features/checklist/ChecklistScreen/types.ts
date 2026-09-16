@@ -1,4 +1,9 @@
-import type { Application, ChecklistItem, ChecklistItemId } from '../model';
+import type {
+  Application,
+  ChecklistItem,
+  ChecklistItemId,
+  DocumentId,
+} from '../model';
 
 export type ChecklistScreenProps = {
   application: Application;
@@ -14,6 +19,19 @@ export type ItemsState =
 export type AttachState =
   | { readonly status: 'idle' }
   | { readonly status: 'working'; readonly itemId: ChecklistItemId }
+  | {
+      readonly status: 'failed';
+      readonly itemId: ChecklistItemId;
+      readonly message: string;
+    };
+
+export type DeleteState =
+  | { readonly status: 'idle' }
+  | {
+      readonly status: 'working';
+      readonly itemId: ChecklistItemId;
+      readonly documentId: DocumentId;
+    }
   | {
       readonly status: 'failed';
       readonly itemId: ChecklistItemId;

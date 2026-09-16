@@ -9,8 +9,9 @@
  * составлен неверно, заявку удаляют и создают заново. Сброс необратим,
  * поэтому сначала диалог с тем, что именно пропадёт (ADR-0012).
  *
- * У каждого пункта — прикрепление файла (`attachDocument.ts`). Пикер в
- * системе один, поэтому одновременно прикрепляется только один файл.
+ * У каждого пункта — прикрепление файла (`attachDocument.ts`) и удаление
+ * прикреплённого (`detachDocument.ts`). Пикер в системе один, а удаление
+ * необратимо, поэтому одновременно идёт только одно действие.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -27,12 +28,16 @@ import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import { ChecklistItemRow } from '../ChecklistItemRow';
 import { pickAndAttachDocument } from '../attachDocument';
+import { deleteAttachedDocument } from '../detachDocument';
 import { describeError } from '../errorMessages';
 import {
   checklistItemKeyOf,
   withAttachedDocument,
+  withoutDocument,
+  type AttachedDocument,
   type ChecklistItem,
   type ChecklistItemId,
+  type DocumentId,
   type ResetImpact,
 } from '../model';
 import {
@@ -40,9 +45,10 @@ import {
   getResetImpact,
   listChecklistItems,
 } from '../repository';
-import { resetConfirmation } from '../reset';
+import { documentDeletionConfirmation, resetConfirmation } from '../reset';
 import {
   ATTACH_IDLE,
+  DELETE_IDLE,
   LOADING,
   RESET_IDLE,
   RESET_WORKING,
@@ -59,9 +65,20 @@ import {
 import type {
   AttachState,
   ChecklistScreenProps,
+  DeleteState,
   ItemsState,
   ResetState,
 } from './types';
+
+/** Сообщение о неудаче — только для того пункта, где она случилась. */
+function errorOfItem(
+  state: AttachState | DeleteState,
+  itemId: ChecklistItemId,
+): string | null {
+  return state.status === 'failed' && state.itemId === itemId
+    ? state.message
+    : null;
+}
 
 export function ChecklistScreen({
   application,
@@ -75,6 +92,10 @@ export function ChecklistScreen({
   // Состояние доезжает до следующего рендера, а второе нажатие может
   // успеть раньше и открыть пикер повторно. Ref закрывает это синхронно.
   const attachingRef = useRef(false);
+  const [deleteState, setDeleteState] = useState<DeleteState>(DELETE_IDLE);
+  // Та же защита, что и у прикрепления: подтверждение в диалоге можно
+  // успеть нажать дважды.
+  const deletingRef = useRef(false);
 
   useEffect(() => {
     // Ответ, пришедший после размонтирования или после повторной
@@ -144,6 +165,72 @@ export function ChecklistScreen({
     }
   }, []);
 
+  const confirmDelete = useCallback(
+    async (itemId: ChecklistItemId, documentId: DocumentId) => {
+      if (deletingRef.current) {
+        return;
+      }
+      deletingRef.current = true;
+      setDeleteState({ status: 'working', itemId, documentId });
+
+      try {
+        await deleteAttachedDocument(itemId, documentId);
+        setState(current =>
+          current.status === 'loaded'
+            ? {
+                status: 'loaded',
+                items: withoutDocument(current.items, itemId, documentId),
+              }
+            : current,
+        );
+        AccessibilityInfo.announceForAccessibility('Файл удалён');
+        setDeleteState(DELETE_IDLE);
+      } catch (error) {
+        setDeleteState({
+          status: 'failed',
+          itemId,
+          message: describeError(error),
+        });
+      } finally {
+        deletingRef.current = false;
+      }
+    },
+    [],
+  );
+
+  const handleDeleteFile = useCallback(
+    (itemId: ChecklistItemId, document: AttachedDocument) => {
+      const item =
+        state.status === 'loaded'
+          ? state.items.find(candidate => candidate.id === itemId)
+          : undefined;
+
+      if (item === undefined) {
+        return;
+      }
+
+      // Удаление необратимо, и диалог говорит об этом прямо — слова
+      // «открепить» здесь быть не должно (ADR-0013).
+      const { title, message } = documentDeletionConfirmation(
+        item.label,
+        document,
+        item.documents.length === 1,
+      );
+
+      Alert.alert(title, message, [
+        { text: 'Отмена', style: 'cancel' },
+        {
+          text: 'Удалить файл',
+          style: 'destructive',
+          onPress: () => {
+            confirmDelete(itemId, document.id);
+          },
+        },
+      ]);
+    },
+    [state, confirmDelete],
+  );
+
   const confirmReset = useCallback(async () => {
     setResetState(RESET_WORKING);
     try {
@@ -185,6 +272,8 @@ export function ChecklistScreen({
   const total = state.status === 'loaded' ? state.items.length : 0;
   const isResetting = resetState.status === 'working';
   const isAttaching = attachState.status === 'working';
+  const isDeleting = deleteState.status === 'working';
+  const isBusy = isAttaching || isDeleting || isResetting;
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChecklistItem>) => (
@@ -195,16 +284,20 @@ export function ChecklistScreen({
         isAttaching={
           attachState.status === 'working' && attachState.itemId === item.id
         }
-        attachDisabled={attachState.status === 'working' || isResetting}
-        attachError={
-          attachState.status === 'failed' && attachState.itemId === item.id
-            ? attachState.message
+        deletingDocumentId={
+          deleteState.status === 'working' && deleteState.itemId === item.id
+            ? deleteState.documentId
             : null
         }
+        actionsDisabled={isBusy}
+        actionError={
+          errorOfItem(attachState, item.id) ?? errorOfItem(deleteState, item.id)
+        }
         onAttach={handleAttach}
+        onDeleteFile={handleDeleteFile}
       />
     ),
-    [total, attachState, isResetting, handleAttach],
+    [total, attachState, deleteState, isBusy, handleAttach, handleDeleteFile],
   );
 
   const header = (
@@ -239,7 +332,7 @@ export function ChecklistScreen({
           label={isResetting ? 'Сброс…' : 'Сбросить заявку'}
           accessibilityLabel="Сбросить заявку и создать её заново"
           testID={TEST_IDS.resetButton}
-          disabled={isResetting || isAttaching}
+          disabled={isBusy}
           onPress={handleResetPress}
         />
       </Footer>

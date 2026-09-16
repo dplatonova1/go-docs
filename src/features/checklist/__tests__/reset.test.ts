@@ -1,4 +1,5 @@
-import { resetConfirmation } from '../reset';
+import type { DocumentId } from '../model';
+import { documentDeletionConfirmation, resetConfirmation } from '../reset';
 
 describe('resetConfirmation', () => {
   it('без документов — только пункты и предупреждение о необратимости', () => {
@@ -34,5 +35,39 @@ describe('resetConfirmation', () => {
 
     expect(message).toContain('документы (1)');
     expect(message).toContain('к другим заявкам (4), останутся');
+  });
+});
+
+describe('documentDeletionConfirmation', () => {
+  const DOCUMENT = { id: 'd1' as DocumentId, name: 'Паспорт.pdf' };
+
+  it('говорит об удалении без восстановления, а не об «откреплении»', () => {
+    const { title, message } = documentDeletionConfirmation(
+      'Паспорт',
+      DOCUMENT,
+      true,
+    );
+
+    expect(title).toBe('Удалить файл «Паспорт.pdf»?');
+    expect(message).toContain('удалён без возможности восстановления');
+    expect(message.toLowerCase()).not.toContain('открепить');
+    expect(message.toLowerCase()).not.toContain('открепление');
+  });
+
+  it('предупреждает, что пункт снова станет неотмеченным — если файл последний', () => {
+    const last = documentDeletionConfirmation('Паспорт', DOCUMENT, true);
+    expect(last.message).toContain('Пункт «Паспорт» снова станет неотмеченным');
+
+    const notLast = documentDeletionConfirmation('Паспорт', DOCUMENT, false);
+    expect(notLast.message).not.toContain('неотмеченным');
+  });
+
+  it('файл без имени называется явно', () => {
+    const { title } = documentDeletionConfirmation(
+      'Паспорт',
+      { id: 'd2' as DocumentId, name: null },
+      false,
+    );
+    expect(title).toBe('Удалить файл «без имени»?');
   });
 });

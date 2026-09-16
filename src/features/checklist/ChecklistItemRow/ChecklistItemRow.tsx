@@ -1,6 +1,7 @@
 /**
  * Пункт сохранённого чек-листа: текст, статус «прикреплено / не
- * прикреплено», имена прикреплённых файлов и кнопка прикрепления.
+ * прикреплено», прикреплённые файлы с кнопкой удаления и кнопка
+ * прикрепления.
  *
  * Элементы озвучиваются по отдельности, а не одной группой: внутри
  * `accessible`-контейнера скринридер не дал бы нажать кнопку.
@@ -9,12 +10,13 @@
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
-import { isAttached } from '../model';
+import { isAttached, type AttachedDocument } from '../model';
 import { STATUS_TEXT, TEST_ID_PREFIX, UNNAMED_FILE } from './constants';
 import {
   Container,
   ErrorText,
   FileName,
+  FileRow,
   Label,
   StatusBadge,
   StatusText,
@@ -26,9 +28,11 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   index,
   total,
   isAttaching,
-  attachDisabled,
-  attachError,
+  deletingDocumentId,
+  actionsDisabled,
+  actionError,
   onAttach,
+  onDeleteFile,
 }: ChecklistItemRowProps) {
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
@@ -38,6 +42,11 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   const handleAttach = useCallback(
     () => onAttach(item.id),
     [item.id, onAttach],
+  );
+
+  const handleDelete = useCallback(
+    (document: AttachedDocument) => onDeleteFile(item.id, document),
+    [item.id, onDeleteFile],
   );
 
   let attachLabel = attached ? 'Прикрепить ещё файл' : 'Прикрепить файл';
@@ -63,28 +72,43 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
         <StatusText $attached={attached}>{statusText}</StatusText>
       </StatusBadge>
 
-      {item.documents.map((document, documentIndex) => (
-        <FileName
-          key={document.id}
-          accessibilityLabel={`Прикреплённый файл: ${
-            document.name ?? UNNAMED_FILE
-          }`}
-          testID={`${testID}-file-${documentIndex}`}
-          // Середина, а не конец: расширение в конце имени важнее.
-          numberOfLines={1}
-          ellipsizeMode="middle"
-        >
-          {document.name ?? UNNAMED_FILE}
-        </FileName>
-      ))}
+      {item.documents.map((document, documentIndex) => {
+        const name = document.name ?? UNNAMED_FILE;
+        const isDeleting = deletingDocumentId === document.id;
 
-      {attachError !== null ? (
+        return (
+          <FileRow key={document.id}>
+            <FileName
+              accessibilityLabel={`Прикреплённый файл: ${name}`}
+              testID={`${testID}-file-${documentIndex}`}
+              // Середина, а не конец: расширение в конце имени важнее.
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {name}
+            </FileName>
+
+            <Button
+              variant="danger"
+              label={isDeleting ? 'Удаление…' : 'Удалить'}
+              // Вслух — что именно удаляется: «Удалить» без имени файла в
+              // списке из нескольких файлов ничего не говорит.
+              accessibilityLabel={`Удалить файл ${name} из пункта ${number}: ${item.label}`}
+              testID={`${testID}-file-${documentIndex}-delete`}
+              disabled={actionsDisabled}
+              onPress={() => handleDelete(document)}
+            />
+          </FileRow>
+        );
+      })}
+
+      {actionError !== null ? (
         <ErrorText
           accessibilityRole="alert"
           accessibilityLiveRegion="polite"
-          testID={`${testID}-attach-error`}
+          testID={`${testID}-error`}
         >
-          {attachError}
+          {actionError}
         </ErrorText>
       ) : null}
 
@@ -93,7 +117,7 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
         label={attachLabel}
         accessibilityLabel={`Прикрепить файл к пункту ${number}: ${item.label}`}
         testID={`${testID}-attach`}
-        disabled={attachDisabled}
+        disabled={actionsDisabled}
         onPress={handleAttach}
       />
     </Container>

@@ -1,6 +1,7 @@
 import {
   isAttached,
   withAttachedDocument,
+  withoutDocument,
   type ChecklistItem,
   type ChecklistItemId,
   type DocumentId,
@@ -54,6 +55,51 @@ describe('withAttachedDocument', () => {
     const next = withAttachedDocument(items, 'a' as ChecklistItemId, DOCUMENT);
 
     expect(next[0]?.status).toBe('done');
+  });
+});
+
+describe('withoutDocument', () => {
+  const OTHER = { id: 'd2' as DocumentId, name: 'second.pdf' };
+
+  it('убирает файл и возвращает пункт в «не прикреплено»', () => {
+    const items = [
+      item('a'),
+      item('b', { status: 'attached', documents: [DOCUMENT] }),
+    ];
+
+    const next = withoutDocument(items, 'b' as ChecklistItemId, DOCUMENT.id);
+
+    expect(next[1]?.documents).toEqual([]);
+    expect(next[1]?.status).toBe('pending');
+    expect(isAttached(next[1]!)).toBe(false);
+    expect(next[0]).toBe(items[0]);
+  });
+
+  it('пока остаются другие файлы, пункт остаётся прикреплённым', () => {
+    const items = [
+      item('a', { status: 'attached', documents: [DOCUMENT, OTHER] }),
+    ];
+
+    const next = withoutDocument(items, 'a' as ChecklistItemId, DOCUMENT.id);
+
+    expect(next[0]?.documents).toEqual([OTHER]);
+    expect(next[0]?.status).toBe('attached');
+  });
+
+  it('статус «готово» не понижает', () => {
+    const items = [item('a', { status: 'done', documents: [DOCUMENT] })];
+
+    const next = withoutDocument(items, 'a' as ChecklistItemId, DOCUMENT.id);
+
+    expect(next[0]?.status).toBe('done');
+  });
+
+  it('неизвестный файл ничего не меняет', () => {
+    const items = [item('a', { status: 'attached', documents: [DOCUMENT] })];
+
+    const next = withoutDocument(items, 'a' as ChecklistItemId, OTHER.id);
+
+    expect(next[0]).toBe(items[0]);
   });
 });
 

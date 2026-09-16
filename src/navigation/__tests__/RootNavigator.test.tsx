@@ -39,6 +39,10 @@ jest.mock('../../features/checklist/attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
 }));
 
+jest.mock('../../features/checklist/detachDocument', () => ({
+  deleteAttachedDocument: jest.fn(),
+}));
+
 const client = require('../../db/client');
 const repository = require('../../features/checklist/repository');
 

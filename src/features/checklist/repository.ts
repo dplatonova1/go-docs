@@ -30,7 +30,11 @@
  *   первичного ключа `checklist_item_documents`, документов по первичному
  *   ключу. Сортировка по `attached_at` во временном B-tree — на сотнях
  *   строк неизмерима;
- * - отметка пункта прикреплённым — по первичному ключу.
+ * - отметка пункта прикреплённым — по первичному ключу;
+ * - удаление связи — по составному первичному ключу
+ *   `checklist_item_documents`; «есть ли ещё связи у документа» — по
+ *   покрывающему `idx_cid_document_id`, «остались ли файлы у пункта» — по
+ *   покрывающему первичному ключу. Все четыре запроса точечные.
  */
 
 import { getDb, withTransaction } from '../../db/client';
@@ -123,6 +127,25 @@ const SELECT_DOCUMENT_PATHS_ONLY_IN_APPLICATION = `SELECT file_path FROM documen
 const DELETE_DOCUMENTS_ONLY_IN_APPLICATION = `DELETE FROM documents WHERE ${ONLY_IN_APPLICATION}`;
 
 const DELETE_APPLICATION = 'DELETE FROM applications WHERE id = ?';
+
+const SELECT_DOCUMENT_PATH = 'SELECT file_path FROM documents WHERE id = ?';
+
+const DELETE_CHECKLIST_ITEM_DOCUMENT =
+  'DELETE FROM checklist_item_documents ' +
+  'WHERE checklist_item_id = ? AND document_id = ?';
+
+const SELECT_ANY_LINK_OF_DOCUMENT =
+  'SELECT 1 FROM checklist_item_documents WHERE document_id = ? LIMIT 1';
+
+const SELECT_ANY_DOCUMENT_OF_ITEM =
+  'SELECT 1 FROM checklist_item_documents WHERE checklist_item_id = ? LIMIT 1';
+
+const DELETE_DOCUMENT = 'DELETE FROM documents WHERE id = ?';
+
+// Обратное к MARK_CHECKLIST_ITEM_ATTACHED: «готово» (Фаза 2) не трогаем.
+const MARK_CHECKLIST_ITEM_PENDING =
+  "UPDATE checklist_items SET status = 'pending', updated_at = ? " +
+  "WHERE id = ? AND status = 'attached'";
 
 type Row = Readonly<Record<string, unknown>>;
 
@@ -341,6 +364,56 @@ export function attachDocumentToItem(
       await tx.execute(MARK_CHECKLIST_ITEM_ATTACHED, [now, input.itemId]);
     });
   });
+}
+
+/**
+ * Снимает связь документа с пунктом и, если это была последняя связь,
+ * удаляет сам документ.
+ *
+ * Одной транзакцией: путь файла → удаление связи → удаление документа,
+ * если связей не осталось → возврат пункта в «не прикреплено», если у
+ * него не осталось файлов. Порядок тот же, что при сбросе заявки: после
+ * удаления связи отличить «ничей документ» от чужого было бы нельзя.
+ *
+ * Документ, оставшийся прикреплённым к другому пункту, не удаляется и его
+ * файл не трогается (ADR-0012). В Фазе 1 таких документов не бывает, но
+ * код на это не полагается.
+ *
+ * @returns путь удалённого файла — его стирает вызывающий уже после
+ *   commit; `null`, если файл нужно оставить.
+ */
+export function detachDocumentFromItem(
+  itemId: ChecklistItemId,
+  documentId: DocumentId,
+): Promise<string | null> {
+  return guarded('Не удалось удалить прикреплённый файл', () =>
+    withTransaction(async tx => {
+      const found = await tx.execute(SELECT_DOCUMENT_PATH, [documentId]);
+      const row = found.rows[0];
+      const filePath =
+        row === undefined ? null : readText(row, 'documents', 'file_path');
+
+      await tx.execute(DELETE_CHECKLIST_ITEM_DOCUMENT, [itemId, documentId]);
+
+      const otherLinks = await tx.execute(SELECT_ANY_LINK_OF_DOCUMENT, [
+        documentId,
+      ]);
+      const documentDeleted = otherLinks.rows.length === 0;
+      if (documentDeleted) {
+        await tx.execute(DELETE_DOCUMENT, [documentId]);
+      }
+
+      const remaining = await tx.execute(SELECT_ANY_DOCUMENT_OF_ITEM, [itemId]);
+      if (remaining.rows.length === 0) {
+        await tx.execute(MARK_CHECKLIST_ITEM_PENDING, [
+          new Date().toISOString(),
+          itemId,
+        ]);
+      }
+
+      return documentDeleted ? filePath : null;
+    }),
+  );
 }
 
 /**

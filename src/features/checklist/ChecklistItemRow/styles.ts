@@ -44,7 +44,21 @@ export const StatusText = styled.Text<StatusStyleProps>`
     $attached ? theme.colors.onPrimary : theme.colors.textSecondary};
 `;
 
+/**
+ * Имя файла и кнопка удаления в одну строку. При крупном системном шрифте
+ * кнопка переносится под имя, а не сжимает его до многоточия.
+ */
+export const FileRow = styled.View`
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+`;
+
 export const FileName = styled.Text`
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: auto;
   ${textSize(14)}
   font-family: ${FONTS.regular};
   color: ${({ theme }) => theme.colors.text};

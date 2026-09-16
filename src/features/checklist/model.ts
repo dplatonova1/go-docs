@@ -102,6 +102,41 @@ export function withAttachedDocument(
   );
 }
 
+/**
+ * Список пунктов после удаления файла — без перечитывания базы.
+ *
+ * Пункт, оставшийся без файлов, снова становится неотмеченным. Статус
+ * «готово» (Фаза 2) при этом не трогается: он про решение пользователя, а
+ * не про наличие файла.
+ */
+export function withoutDocument(
+  items: readonly ChecklistItem[],
+  itemId: ChecklistItemId,
+  documentId: DocumentId,
+): readonly ChecklistItem[] {
+  return items.map((item): ChecklistItem => {
+    if (item.id !== itemId) {
+      return item;
+    }
+
+    const documents = item.documents.filter(
+      document => document.id !== documentId,
+    );
+    if (documents.length === item.documents.length) {
+      return item;
+    }
+
+    return {
+      ...item,
+      documents,
+      status:
+        documents.length === 0 && item.status === 'attached'
+          ? 'pending'
+          : item.status,
+    };
+  });
+}
+
 /** Всё, что записывается в БД при прикреплении файла к пункту. */
 export type NewDocumentAttachment = {
   readonly id: DocumentId;
