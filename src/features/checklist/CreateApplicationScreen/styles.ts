@@ -19,12 +19,6 @@ export const Footer = styled.View`
   gap: 12px;
 `;
 
-export const Heading = styled.Text`
-  ${textSize(24)}
-  font-family: ${FONTS.bold};
-  color: ${({ theme }) => theme.colors.text};
-`;
-
 export const SectionTitle = styled.Text`
   ${textSize(18)}
   font-family: ${FONTS.semibold};

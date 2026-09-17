@@ -149,6 +149,11 @@ export type NewDocumentAttachment = {
   readonly sizeBytes: number;
 };
 
+/** `keyExtractor` для списка заявок: стабильный id из БД, не индекс. */
+export function applicationKeyOf(application: Application): string {
+  return application.id;
+}
+
 /** `keyExtractor` для списков пунктов: стабильный id из БД, не индекс. */
 export function checklistItemKeyOf(item: ChecklistItem): string {
   return item.id;

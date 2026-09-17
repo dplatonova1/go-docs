@@ -1,6 +1,6 @@
 import { StorageError, StorageErrorCode } from '../../../storage/errors';
 import { describeError } from '../errorMessages';
-import { ApplicationAlreadyExistsError, AttachmentError } from '../errors';
+import { AttachmentError } from '../errors';
 
 describe('describeError', () => {
   it.each(Object.values(StorageErrorCode))(
@@ -21,12 +21,6 @@ describe('describeError', () => {
       expect(message).not.toContain(code);
     },
   );
-
-  it('вторая заявка — своё сообщение', () => {
-    expect(describeError(new ApplicationAlreadyExistsError())).toContain(
-      'Заявка уже создана',
-    );
-  });
 
   it('неизвестная ошибка — общее сообщение без внутренностей', () => {
     const message = describeError(new Error('SQLITE_CORRUPT at 0x1f'));

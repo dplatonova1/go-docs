@@ -13,7 +13,6 @@ import {
   StorageErrorCode,
   isStorageError,
 } from '../../../storage/errors';
-import { ApplicationAlreadyExistsError } from '../errors';
 import type {
   ApplicationId,
   ChecklistItemId,
@@ -25,8 +24,11 @@ import {
   attachDocumentToItem,
   createApplication,
   detachDocumentFromItem,
-  getActiveApplication,
+  getApplicationById,
+  getLastOpenedApplication,
+  listApplications,
   listChecklistItems,
+  markApplicationOpened,
 } from '../repository';
 
 jest.mock('../../../db/client', () => ({
@@ -88,15 +90,15 @@ beforeEach(() => {
   ids.newId.mockImplementation(() => `id-${++counter}`);
 });
 
-describe('getActiveApplication', () => {
+describe('getLastOpenedApplication', () => {
   it('без заявки возвращает null', async () => {
     client.getDb.mockResolvedValue(fakeDb([]));
-    await expect(getActiveApplication()).resolves.toBeNull();
+    await expect(getLastOpenedApplication()).resolves.toBeNull();
   });
 
   it('возвращает заявку из строки', async () => {
     client.getDb.mockResolvedValue(fakeDb([{ id: 'app-1', title: 'ВНЖ' }]));
-    await expect(getActiveApplication()).resolves.toEqual({
+    await expect(getLastOpenedApplication()).resolves.toEqual({
       id: 'app-1',
       title: 'ВНЖ',
     });
@@ -104,7 +106,7 @@ describe('getActiveApplication', () => {
 
   it('строка неожиданной формы — StorageError, а не undefined в модели', async () => {
     client.getDb.mockResolvedValue(fakeDb([{ id: 'app-1', title: null }]));
-    const error = await failureOf(getActiveApplication);
+    const error = await failureOf(getLastOpenedApplication);
     expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
   });
 
@@ -112,7 +114,7 @@ describe('getActiveApplication', () => {
     client.getDb.mockResolvedValue({
       execute: jest.fn().mockRejectedValue(new Error('SQLITE_CORRUPT')),
     });
-    const error = await failureOf(getActiveApplication);
+    const error = await failureOf(getLastOpenedApplication);
     expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
   });
 
@@ -120,10 +122,101 @@ describe('getActiveApplication', () => {
     client.getDb.mockRejectedValue(
       new StorageError(StorageErrorCode.EncryptionKeyLost, 'ключ потерян'),
     );
-    const error = await failureOf(getActiveApplication);
+    const error = await failureOf(getLastOpenedApplication);
     expect(isStorageError(error, StorageErrorCode.EncryptionKeyLost)).toBe(
       true,
     );
+  });
+
+  it('берёт последнюю открытую, а не последнюю созданную', async () => {
+    const db = fakeDb([{ id: 'app-1', title: 'ВНЖ' }]);
+    client.getDb.mockResolvedValue(db);
+
+    await getLastOpenedApplication();
+
+    const [sql] = db.execute.mock.calls[0] as unknown as [string];
+    expect(sql).toContain('COALESCE(last_opened_at, created_at) DESC');
+    expect(sql).toContain('LIMIT 1');
+  });
+});
+
+describe('listApplications', () => {
+  it('без заявок возвращает пустой список', async () => {
+    client.getDb.mockResolvedValue(fakeDb([]));
+    await expect(listApplications()).resolves.toEqual([]);
+  });
+
+  it('возвращает все заявки в порядке запроса — недавние сверху', async () => {
+    const db = fakeDb([
+      { id: 'app-2', title: 'ПМЖ' },
+      { id: 'app-1', title: 'ВНЖ' },
+    ]);
+    client.getDb.mockResolvedValue(db);
+
+    await expect(listApplications()).resolves.toEqual([
+      { id: 'app-2', title: 'ПМЖ' },
+      { id: 'app-1', title: 'ВНЖ' },
+    ]);
+
+    const [sql] = db.execute.mock.calls[0] as unknown as [string];
+    expect(sql).toContain('COALESCE(last_opened_at, created_at) DESC');
+    expect(sql).not.toContain('LIMIT');
+  });
+
+  it('строка неожиданной формы — StorageError', async () => {
+    client.getDb.mockResolvedValue(fakeDb([{ id: 'app-1' }]));
+    const error = await failureOf(listApplications);
+    expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
+  });
+});
+
+describe('getApplicationById', () => {
+  const APP_ID = 'app-1' as ApplicationId;
+
+  it('удалённая заявка — null, а не ошибка', async () => {
+    client.getDb.mockResolvedValue(fakeDb([]));
+    await expect(getApplicationById(APP_ID)).resolves.toBeNull();
+  });
+
+  it('ищет по первичному ключу', async () => {
+    const db = fakeDb([{ id: 'app-1', title: 'ВНЖ' }]);
+    client.getDb.mockResolvedValue(db);
+
+    await expect(getApplicationById(APP_ID)).resolves.toEqual({
+      id: 'app-1',
+      title: 'ВНЖ',
+    });
+
+    expect(db.execute).toHaveBeenCalledWith(
+      expect.stringContaining('WHERE id = ?'),
+      ['app-1'],
+    );
+  });
+});
+
+describe('markApplicationOpened', () => {
+  const APP_ID = 'app-1' as ApplicationId;
+
+  it('обновляет отметку у нужной заявки', async () => {
+    const db = fakeDb([]);
+    client.getDb.mockResolvedValue(db);
+
+    await markApplicationOpened(APP_ID);
+
+    const [sql, params] = db.execute.mock.calls[0] as unknown as [
+      string,
+      unknown[],
+    ];
+    expect(sql).toContain('UPDATE applications SET last_opened_at');
+    expect(params).toEqual([expect.any(String), 'app-1']);
+  });
+
+  it('сбой драйвера оборачивается в StorageError — решает вызывающий', async () => {
+    client.getDb.mockResolvedValue({
+      execute: jest.fn().mockRejectedValue(new Error('SQLITE_BUSY')),
+    });
+    const error = await failureOf(() => markApplicationOpened(APP_ID));
+    expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
   });
 });
 
@@ -136,13 +229,15 @@ describe('createApplication', () => {
     expect(client.withTransaction).toHaveBeenCalledTimes(1);
     expect(application).toEqual({ id: 'id-1', title: 'ВНЖ Сербия' });
 
-    const [guard, insertApplication, ...insertItems] = tx.execute.mock.calls;
+    const [insertApplication, ...insertItems] = tx.execute.mock.calls;
 
-    expect(guard?.[0]).toContain('FROM applications');
     expect(insertApplication?.[0]).toContain('INSERT INTO applications');
+    // created_at, updated_at и last_opened_at: созданная заявка сразу
+    // считается последней открытой (ADR-0015).
     expect(insertApplication?.[1]).toEqual([
       'id-1',
       'ВНЖ Сербия',
+      expect.any(String),
       expect.any(String),
       expect.any(String),
     ]);
@@ -168,18 +263,19 @@ describe('createApplication', () => {
     await createApplication(NEW_APPLICATION);
 
     const itemIds = tx.execute.mock.calls
-      .slice(2)
+      .slice(1)
       .map(call => (call[1] as unknown as unknown[])[0]);
     expect(new Set(itemIds).size).toBe(3);
   });
 
-  it('вторую заявку не создаёт и ничего не пишет', async () => {
-    const tx = mockTransaction([{ 1: 1 }]);
+  it('вторую заявку создаёт наравне с первой (ADR-0015)', async () => {
+    const tx = mockTransaction([{ id: 'app-1', title: 'ВНЖ Сербия' }]);
 
-    const error = await failureOf(() => createApplication(NEW_APPLICATION));
+    const application = await createApplication(NEW_APPLICATION);
 
-    expect(error).toBeInstanceOf(ApplicationAlreadyExistsError);
-    expect(tx.execute).toHaveBeenCalledTimes(1);
+    expect(application).toEqual({ id: 'id-1', title: 'ВНЖ Сербия' });
+    // Заявка и три пункта — ни одного запроса-стража перед ними.
+    expect(tx.execute).toHaveBeenCalledTimes(4);
   });
 
   it('сбой записи — StorageError', async () => {

@@ -7,7 +7,7 @@ import type {
 
 export type ChecklistScreenProps = {
   application: Application;
-  /** Заявка удалена — вернуться к созданию новой. */
+  /** Заявка удалена — вернуться к списку заявок. */
   onReset: () => void;
 };
 

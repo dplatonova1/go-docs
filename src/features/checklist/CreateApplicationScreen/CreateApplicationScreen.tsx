@@ -1,5 +1,5 @@
 /**
- * Создание заявки (Фаза 1).
+ * Создание заявки.
  *
  * Поток: название → вставка текста с сайта → «Разобрать на пункты» →
  * правка получившегося списка → «Сохранить заявку». Эвристика разбора
@@ -22,7 +22,6 @@ import {
 import {
   AccessibilityInfo,
   Alert,
-  BackHandler,
   FlatList,
   type ListRenderItemInfo,
 } from 'react-native';
@@ -60,7 +59,6 @@ import {
   Footer,
   FormError,
   Header,
-  Heading,
   Hint,
   SectionTitle,
   listContentStyle,
@@ -69,6 +67,7 @@ import type { CreateApplicationScreenProps, SaveState } from './types';
 
 export function CreateApplicationScreen({
   onCreated,
+  onDirtyChange,
 }: CreateApplicationScreenProps) {
   const [title, setTitle] = useState('');
   const [pastedText, setPastedText] = useState('');
@@ -92,34 +91,11 @@ export function CreateApplicationScreen({
   const isSaving = saveState.status === 'saving';
   const isDirty = hasUnsavedInput(title, pastedText, items);
 
-  // Экран корневой: «назад» на Android закрывает приложение, и черновик
-  // пропадает. Если терять есть что — спрашиваем.
+  // Терять черновик при уходе с экрана нельзя, но диалог показывает
+  // маршрут: способов уйти несколько, и все они известны навигации.
   useEffect(() => {
-    if (!isDirty) {
-      return undefined;
-    }
-
-    const subscription = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        Alert.alert(
-          'Выйти без сохранения?',
-          'Название и список пунктов не сохранены и пропадут.',
-          [
-            { text: 'Остаться', style: 'cancel' },
-            {
-              text: 'Выйти',
-              style: 'destructive',
-              onPress: () => BackHandler.exitApp(),
-            },
-          ],
-        );
-        return true;
-      },
-    );
-
-    return () => subscription.remove();
-  }, [isDirty]);
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
 
   const handlePastedTextChange = useCallback((value: string) => {
     setPastedText(value);
@@ -256,8 +232,6 @@ export function CreateApplicationScreen({
 
   const header = (
     <Header>
-      <Heading accessibilityRole="header">Новая заявка</Heading>
-
       <TextField
         label="Название заявки"
         accessibilityLabel="Название заявки"

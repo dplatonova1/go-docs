@@ -97,6 +97,26 @@ export const MIGRATIONS: readonly Migration[] = [
        )`,
     ],
   },
+
+  {
+    version: 2,
+    name: 'application_last_opened_at',
+    statements: [
+      // Какую заявку открыть при запуске — ADR-0015. Колонкой в
+      // `applications`, а не отдельным хранилищем: ссылка на заявку вне
+      // её строки могла бы указывать на удалённую, а эта исчезает вместе
+      // со строкой.
+      //
+      // Nullable вынужденно: SQLite не добавляет NOT NULL без
+      // константного DEFAULT. Заполняется сразу следующим оператором, и
+      // дальше её пишет каждое создание и открытие заявки.
+      `ALTER TABLE applications ADD COLUMN last_opened_at TEXT`,
+
+      // Бэкфилл: единственная заявка Фазы 1 иначе выглядела бы
+      // «никогда не открывавшейся».
+      `UPDATE applications SET last_opened_at = updated_at`,
+    ],
+  },
 ];
 
 /**

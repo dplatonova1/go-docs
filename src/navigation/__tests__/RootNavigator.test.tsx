@@ -1,6 +1,13 @@
 /**
- * Логика запуска Фазы 1: заявка есть — сразу её чек-лист, заявки нет —
- * экран создания. Хранилище замокано на нашей границе.
+ * Запуск приложения и переходы между экранами.
+ *
+ * Хранилище замокано на нашей границе (`db/client` и репозиторий), а
+ * навигация — настоящая: проверяется в том числе то, что делает стек —
+ * возврат к списку и замена экрана создания на чек-лист.
+ *
+ * Экраны стека остаются смонтированными под верхним, поэтому «список
+ * заявок есть в дереве» само по себе ничего не значит — проверяется
+ * верхний экран.
  */
 
 import React from 'react';
@@ -30,9 +37,14 @@ jest.mock('../../db/client', () => ({
 }));
 
 jest.mock('../../features/checklist/repository', () => ({
-  getActiveApplication: jest.fn(),
+  listApplications: jest.fn(),
+  getLastOpenedApplication: jest.fn(),
+  getApplicationById: jest.fn(),
+  markApplicationOpened: jest.fn(),
   listChecklistItems: jest.fn(),
   createApplication: jest.fn(),
+  deleteApplication: jest.fn(),
+  getResetImpact: jest.fn(),
 }));
 
 jest.mock('../../features/checklist/attachDocument', () => ({
@@ -49,8 +61,16 @@ const repository = require('../../features/checklist/repository');
 const APPLICATION = { id: 'app-1', title: 'ВНЖ Сербия' };
 
 beforeEach(() => {
-  jest.resetAllMocks();
+  // Именно clear, а не reset: официальный мок safe-area-context — тоже
+  // jest.fn, и `resetAllMocks` стёр бы его реализацию. Тогда
+  // `useSafeAreaInsets()` вернул бы undefined, и шапка навигации упала бы
+  // на `insets.top` — ошибка, не имеющая отношения к тесту.
+  jest.clearAllMocks();
   client.runMigrations.mockResolvedValue(undefined);
+  repository.listApplications.mockResolvedValue([]);
+  repository.getLastOpenedApplication.mockResolvedValue(null);
+  repository.getApplicationById.mockResolvedValue(APPLICATION);
+  repository.markApplicationOpened.mockResolvedValue(undefined);
   repository.listChecklistItems.mockResolvedValue([]);
 });
 
@@ -62,20 +82,20 @@ async function renderNavigator() {
   return tree;
 }
 
-it('заявки нет — экран создания; миграции применяются до чтения', async () => {
-  repository.getActiveApplication.mockResolvedValue(null);
-
+it('заявок нет — список с подсказкой; миграции применяются до чтения', async () => {
   const tree = await renderNavigator();
 
-  expect(exists(tree, 'create-application-screen')).toBe(true);
+  expect(exists(tree, 'application-list-screen')).toBe(true);
+  expect(exists(tree, 'application-list-empty')).toBe(true);
   expect(exists(tree, 'checklist-screen')).toBe(false);
   expect(client.runMigrations.mock.invocationCallOrder[0]).toBeLessThan(
-    repository.getActiveApplication.mock.invocationCallOrder[0],
+    repository.getLastOpenedApplication.mock.invocationCallOrder[0],
   );
 });
 
-it('заявка есть — сразу её чек-лист, без экрана создания', async () => {
-  repository.getActiveApplication.mockResolvedValue(APPLICATION);
+it('есть последняя открытая — сразу её чек-лист', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.listApplications.mockResolvedValue([APPLICATION]);
   repository.listChecklistItems.mockResolvedValue([
     {
       id: 'i1',
@@ -90,16 +110,54 @@ it('заявка есть — сразу её чек-лист, без экран
   const tree = await renderNavigator();
 
   expect(exists(tree, 'checklist-screen')).toBe(true);
-  expect(exists(tree, 'create-application-screen')).toBe(false);
+  expect(repository.getApplicationById).toHaveBeenCalledWith('app-1');
   expect(repository.listChecklistItems).toHaveBeenCalledWith('app-1');
   expect(texts(tree)).toEqual(
-    expect.arrayContaining(['ВНЖ Сербия', '1. Паспорт', '2. Фото']),
+    expect.arrayContaining(['1. Паспорт', '2. Фото']),
   );
 });
 
-it('после создания заявки открывается её чек-лист', async () => {
-  repository.getActiveApplication.mockResolvedValue(null);
+it('открытая заявка отмечается открытой — от этого зависит следующий запуск', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+
+  await renderNavigator();
+
+  expect(repository.markApplicationOpened).toHaveBeenCalledWith('app-1');
+});
+
+it('сбой отметки «открыта» не мешает работать с чек-листом', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.markApplicationOpened.mockRejectedValue(
+    new StorageError(StorageErrorCode.DatabaseFailure, 'SQLITE_BUSY'),
+  );
+
   const tree = await renderNavigator();
+
+  expect(exists(tree, 'checklist-screen')).toBe(true);
+});
+
+it('заявка из восстановленного маршрута удалена — сообщение и путь к списку', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.getApplicationById.mockResolvedValue(null);
+
+  const tree = await renderNavigator();
+
+  expect(exists(tree, 'checklist-route-missing')).toBe(true);
+  expect(exists(tree, 'checklist-screen')).toBe(false);
+
+  await press(tree, 'back-to-applications-button');
+  await flush();
+
+  expect(exists(tree, 'checklist-route-missing')).toBe(false);
+  expect(exists(tree, 'application-list-screen')).toBe(true);
+});
+
+it('из списка можно создать заявку и попасть в её чек-лист', async () => {
+  const tree = await renderNavigator();
+
+  await press(tree, 'create-application-button');
+  await flush();
+  expect(exists(tree, 'create-application-screen')).toBe(true);
 
   await ReactTestRenderer.act(async () => {
     tree.root.findByType(CreateApplicationScreen).props.onCreated(APPLICATION);
@@ -107,7 +165,22 @@ it('после создания заявки открывается её чек-
   await flush();
 
   expect(exists(tree, 'checklist-screen')).toBe(true);
+  // Экран создания заменён, а не оставлен под чек-листом: возвращаться к
+  // заполненной форме уже сохранённой заявки некуда.
   expect(exists(tree, 'create-application-screen')).toBe(false);
+});
+
+it('после сброса заявки — возврат к списку', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  const tree = await renderNavigator();
+
+  await ReactTestRenderer.act(async () => {
+    tree.root.findByType(ChecklistScreen).props.onReset();
+  });
+  await flush();
+
+  expect(exists(tree, 'checklist-screen')).toBe(false);
+  expect(exists(tree, 'application-list-screen')).toBe(true);
 });
 
 it('хранилище недоступно — понятная ошибка и повтор', async () => {
@@ -116,28 +189,15 @@ it('хранилище недоступно — понятная ошибка и
     'детали для разработчика',
   );
   client.runMigrations.mockRejectedValueOnce(failure);
-  repository.getActiveApplication.mockResolvedValue(null);
 
   const tree = await renderNavigator();
 
   expect(exists(tree, 'launch-failed')).toBe(true);
   expect(texts(tree)).toContain(describeError(failure));
-  expect(repository.getActiveApplication).not.toHaveBeenCalled();
+  expect(repository.getLastOpenedApplication).not.toHaveBeenCalled();
 
   await press(tree, 'launch-retry-button');
   await flush();
 
-  expect(exists(tree, 'create-application-screen')).toBe(true);
-});
-
-it('после сброса заявки — снова экран создания', async () => {
-  repository.getActiveApplication.mockResolvedValue(APPLICATION);
-  const tree = await renderNavigator();
-
-  await ReactTestRenderer.act(async () => {
-    tree.root.findByType(ChecklistScreen).props.onReset();
-  });
-
-  expect(exists(tree, 'create-application-screen')).toBe(true);
-  expect(exists(tree, 'checklist-screen')).toBe(false);
+  expect(exists(tree, 'application-list-screen')).toBe(true);
 });

@@ -22,9 +22,9 @@
 ```mermaid
 graph TD
     UI["UI-слой<br/>src/components + src/features"]
-    NAV["Навигация<br/>src/navigation"]
+    NAV["Навигация<br/>src/navigation<br/>React Navigation (native-stack)"]
 
-    UI --> NAV
+    NAV --> UI
     UI --> CHK["Checklist<br/>разбивка текста, эвристика"]
     UI --> PKG["Package builder<br/>@cantoo/pdf-lib: сборка + реестр"]
     UI --> FORMS["Form filler<br/>docx / PDF AcroForm"]

@@ -8,11 +8,7 @@
  */
 
 import { StorageErrorCode, isStorageError } from '../../storage/errors';
-import {
-  ApplicationAlreadyExistsError,
-  AttachmentError,
-  type AttachmentErrorCode,
-} from './errors';
+import { AttachmentError, type AttachmentErrorCode } from './errors';
 import { MAX_ATTACHMENT_MEGABYTES } from './model';
 
 const STORAGE_ERROR_MESSAGES = {
@@ -48,15 +44,9 @@ const ATTACHMENT_ERROR_MESSAGES = {
     'Этот файл нельзя прикрепить в таком виде. Сохраните его как PDF или изображение и попробуйте снова.',
 } as const satisfies Record<AttachmentErrorCode, string>;
 
-const APPLICATION_EXISTS_MESSAGE =
-  'Заявка уже создана. Перезапустите приложение, чтобы открыть её.';
-
 const UNKNOWN_ERROR_MESSAGE = 'Непредвиденная ошибка. Попробуйте ещё раз.';
 
 export function describeError(error: unknown): string {
-  if (error instanceof ApplicationAlreadyExistsError) {
-    return APPLICATION_EXISTS_MESSAGE;
-  }
   if (error instanceof AttachmentError) {
     return ATTACHMENT_ERROR_MESSAGES[error.code];
   }

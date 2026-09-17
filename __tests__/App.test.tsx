@@ -2,7 +2,7 @@
  * @format
  *
  * Smoke-тест корневого компонента: дерево собирается, провайдеры на
- * месте, и без заявки запуск приводит на экран её создания.
+ * месте, и без заявок запуск приводит на список заявок.
  *
  * Хранилище заменено заглушками на нашей границе (db/client и
  * репозиторий), а не на уровне нативных библиотек: работа хранилища
@@ -25,9 +25,14 @@ jest.mock('../src/db/client', () => ({
 }));
 
 jest.mock('../src/features/checklist/repository', () => ({
-  getActiveApplication: jest.fn().mockResolvedValue(null),
+  listApplications: jest.fn().mockResolvedValue([]),
+  getLastOpenedApplication: jest.fn().mockResolvedValue(null),
+  getApplicationById: jest.fn(),
+  markApplicationOpened: jest.fn(),
   listChecklistItems: jest.fn(),
   createApplication: jest.fn(),
+  deleteApplication: jest.fn(),
+  getResetImpact: jest.fn(),
 }));
 
 jest.mock('../src/features/checklist/attachDocument', () => ({
@@ -38,7 +43,7 @@ jest.mock('../src/features/checklist/detachDocument', () => ({
   deleteAttachedDocument: jest.fn(),
 }));
 
-test('без заявки открывает экран создания', async () => {
+test('без заявок открывает список заявок', async () => {
   let tree!: ReactTestRenderer.ReactTestRenderer;
 
   await ReactTestRenderer.act(async () => {
@@ -46,7 +51,7 @@ test('без заявки открывает экран создания', async
   });
 
   expect(
-    tree.root.findAll(node => node.props.testID === 'create-application-screen')
+    tree.root.findAll(node => node.props.testID === 'application-list-screen')
       .length,
   ).toBeGreaterThan(0);
 });

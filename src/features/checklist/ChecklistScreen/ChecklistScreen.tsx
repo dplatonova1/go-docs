@@ -1,9 +1,9 @@
 /**
- * Чек-лист активной заявки.
+ * Чек-лист заявки.
  *
- * Фаза 1: открывается сразу при запуске, если заявка уже создана.
- * Переключения между заявками нет и не будет до отдельного решения —
- * заявка одна.
+ * Заявку выбирает маршрут (`navigation/routes/ChecklistRoute.tsx`) — сюда
+ * она приходит готовой. Название показывает шапка навигации, поэтому
+ * своего заголовка у экрана нет (ADR-0014).
  *
  * Под списком — сброс заявки: если список документов при создании
  * составлен неверно, заявку удаляют и создают заново. Сброс необратим,
@@ -54,14 +54,7 @@ import {
   RESET_WORKING,
   TEST_IDS,
 } from './constants';
-import {
-  ErrorText,
-  Footer,
-  Header,
-  Heading,
-  Summary,
-  listContentStyle,
-} from './styles';
+import { ErrorText, Footer, Header, Summary, listContentStyle } from './styles';
 import type {
   AttachState,
   ChecklistScreenProps,
@@ -302,7 +295,6 @@ export function ChecklistScreen({
 
   const header = (
     <Header>
-      <Heading accessibilityRole="header">{application.title}</Heading>
       {state.status === 'loaded' ? (
         <Summary>{`Пунктов в чек-листе: ${total}`}</Summary>
       ) : null}

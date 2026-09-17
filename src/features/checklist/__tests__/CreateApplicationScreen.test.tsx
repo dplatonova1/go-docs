@@ -12,6 +12,10 @@ import { AccessibilityInfo, Alert, type AlertButton } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
 import {
+  StorageError,
+  StorageErrorCode,
+} from '../../../storage/errors';
+import {
   cleanup,
   exists,
   findByTestId,
@@ -22,7 +26,6 @@ import {
   type Tree,
 } from '../../../test-utils/render';
 import { CreateApplicationScreen } from '../CreateApplicationScreen';
-import { ApplicationAlreadyExistsError } from '../errors';
 
 jest.mock('react-native-safe-area-context', () => {
   const mock = require('react-native-safe-area-context/jest/mock');
@@ -48,9 +51,17 @@ function draftLabels(tree: Tree): string[] {
     .map(node => node.props.value);
 }
 
-async function renderScreen(onCreated: jest.Mock = jest.fn()) {
-  const tree = await render(<CreateApplicationScreen onCreated={onCreated} />);
-  return { tree, onCreated };
+async function renderScreen(
+  onCreated: jest.Mock = jest.fn(),
+  onDirtyChange: jest.Mock = jest.fn(),
+) {
+  const tree = await render(
+    <CreateApplicationScreen
+      onCreated={onCreated}
+      onDirtyChange={onDirtyChange}
+    />,
+  );
+  return { tree, onCreated, onDirtyChange };
 }
 
 async function parse(tree: Tree, text: string) {
@@ -275,7 +286,7 @@ describe('сохранение', () => {
 
   it('ошибка сохранения показывается, список не теряется, можно повторить', async () => {
     repository.createApplication.mockRejectedValue(
-      new ApplicationAlreadyExistsError(),
+      new StorageError(StorageErrorCode.DatabaseFailure, 'SQLITE_FULL'),
     );
     const { tree, onCreated } = await renderScreen();
     typeText(tree, 'application-title-input', 'ВНЖ');
@@ -344,5 +355,28 @@ describe('доступность', () => {
     await press(tree, 'save-application-button');
 
     expect(interactiveWithoutA11y(tree)).toEqual([]);
+  });
+});
+
+describe('несохранённый черновик', () => {
+  it('экран сообщает о нём наружу — подтверждение ухода показывает маршрут', async () => {
+    const { tree, onDirtyChange } = await renderScreen();
+
+    // Пустая форма — терять нечего.
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+
+    typeText(tree, 'application-title-input', 'ВНЖ');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
+
+    typeText(tree, 'application-title-input', '');
+    expect(onDirtyChange).toHaveBeenLastCalledWith(false);
+  });
+
+  it('разобранные пункты — тоже черновик', async () => {
+    const { tree, onDirtyChange } = await renderScreen();
+
+    await parse(tree, 'Паспорт\nФото');
+
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true);
   });
 });

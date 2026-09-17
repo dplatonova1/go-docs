@@ -96,6 +96,18 @@ describe('MIGRATIONS', () => {
     }
   });
 
+  it('миграция 2 добавляет отметку последнего открытия и заполняет её', () => {
+    // ADR-0015: колонка nullable вынужденно (SQLite не добавляет NOT NULL
+    // без константного DEFAULT), поэтому бэкфилл обязателен — иначе
+    // существующая заявка выглядела бы «никогда не открывавшейся».
+    const second = MIGRATIONS.find(item => item.version === 2);
+
+    expect(second?.statements).toEqual([
+      'ALTER TABLE applications ADD COLUMN last_opened_at TEXT',
+      'UPDATE applications SET last_opened_at = updated_at',
+    ]);
+  });
+
   it('перечислимые столбцы защищены CHECK-ограничениями', () => {
     // Допустимые значения держатся на уровне БД, а не на аккуратности
     // вызывающего кода: опечатка 'complete' вместо 'completed'

@@ -26,7 +26,7 @@ export function resetConfirmation(
   impact: ResetImpact,
 ): ResetConfirmation {
   const parts = [
-    `Будут удалены все пункты чек-листа (${impact.itemCount}), и вы вернётесь к созданию заявки.`,
+    `Будут удалены все пункты чек-листа (${impact.itemCount}), и вы вернётесь к списку заявок.`,
   ];
 
   if (impact.deletedDocumentCount > 0) {

@@ -20,6 +20,8 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0011](./0011-styled-components.md) | Стили компонентов — styled-components, тема через `ThemeProvider` | Accepted |
 | [0012](./0012-delete-orphan-documents-with-application.md) | Удаление заявки удаляет документы, которые больше ни к чему не прикреплены (с подтверждением) | Accepted |
 | [0013](./0013-detach-deletes-document-in-phase-1.md) | Открепление файла в Фазе 1 — полное удаление документа, а не снятие связи | Accepted (временно, заменяется в Фазе 2) |
+| [0014](./0014-react-navigation-native-stack.md) | Навигация — React Navigation (native-stack) | Accepted |
+| [0015](./0015-multiple-applications-last-opened.md) | Несколько заявок; активная — последняя открытая | Accepted |
 
 ## Когда заводить новый ADR
 

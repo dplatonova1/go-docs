@@ -1,9 +1,10 @@
 /**
- * Запросы к заявке и её пунктам чек-листа.
+ * Запросы к заявкам и их пунктам чек-листа.
  *
- * Фаза 1: активная заявка ровно одна. Экрана со списком заявок нет, и
- * здесь нет ничего, что предполагало бы несколько: создание отказывает,
- * если заявка уже существует.
+ * Заявок может быть несколько ([ADR-0015](../../../docs/adr/0015-multiple-applications-last-opened.md)).
+ * «Активная» — та, которую открывали последней: отметку ставит
+ * `markApplicationOpened`, читают `getLastOpenedApplication` и
+ * `listApplications`.
  *
  * Строки из БД не приводятся к типам через `as`, а проверяются по
  * колонкам. Схема может разойтись с кодом (миграция не доехала,
@@ -15,8 +16,10 @@
  *   сортировка по `position` во временном B-tree. Составной индекс
  *   `(application_id, position)` убрал бы сортировку, но на десятках
  *   строк она неизмерима, а индекс — это миграция и цена каждой записи;
- * - проверка «заявка уже есть» идёт по покрывающему индексу первичного
- *   ключа;
+ * - список заявок и последняя открытая — полный проход по
+ *   `applications` с сортировкой во временном B-tree. Заявок у человека
+ *   единицы, индекс по `last_opened_at` не заводится (ADR-0015);
+ * - заявка по id и отметка «открыта» — по первичному ключу;
  * - вставка пунктов — отдельный `INSERT` на пункт внутри одной
  *   транзакции: запись на диск одна, на commit, поэтому склеивать их в
  *   многострочный `INSERT` с динамическим числом плейсхолдеров незачем;
@@ -41,7 +44,6 @@ import { getDb, withTransaction } from '../../db/client';
 import { newId } from '../../db/ids';
 import { StorageError, StorageErrorCode } from '../../storage/errors';
 import { deleteFile, toRelativePath } from '../../storage/fs';
-import { ApplicationAlreadyExistsError } from './errors';
 import {
   isChecklistItemStatus,
   type Application,
@@ -56,15 +58,26 @@ import {
   type ResetImpact,
 } from './model';
 
-// Самая ранняя по дате создания: заявка в Фазе 1 одна, а порядок нужен,
-// чтобы результат был детерминированным, даже если правило нарушится.
-const SELECT_ACTIVE_APPLICATION =
-  'SELECT id, title FROM applications ORDER BY created_at, id LIMIT 1';
+// Недавние сверху. COALESCE защитный: миграция 2 заполнила колонку у
+// существующих строк, а создание заявки пишет её сразу — но полагаться
+// на «NULL тут не бывает» в модуле, который проверяет каждую колонку,
+// неправильно. `id` — детерминированный разрыв ничьей.
+const APPLICATION_ORDER =
+  'ORDER BY COALESCE(last_opened_at, created_at) DESC, id DESC';
 
-const SELECT_ANY_APPLICATION = 'SELECT 1 FROM applications LIMIT 1';
+const SELECT_APPLICATIONS = `SELECT id, title FROM applications ${APPLICATION_ORDER}`;
+
+const SELECT_LAST_OPENED_APPLICATION = `SELECT id, title FROM applications ${APPLICATION_ORDER} LIMIT 1`;
+
+const SELECT_APPLICATION_BY_ID =
+  'SELECT id, title FROM applications WHERE id = ?';
+
+const MARK_APPLICATION_OPENED =
+  'UPDATE applications SET last_opened_at = ? WHERE id = ?';
 
 const INSERT_APPLICATION =
-  'INSERT INTO applications (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)';
+  'INSERT INTO applications (id, title, created_at, updated_at, last_opened_at) ' +
+  'VALUES (?, ?, ?, ?, ?)';
 
 const INSERT_CHECKLIST_ITEM =
   'INSERT INTO checklist_items ' +
@@ -250,23 +263,70 @@ async function guarded<T>(message: string, run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (error) {
-    if (
-      error instanceof StorageError ||
-      error instanceof ApplicationAlreadyExistsError
-    ) {
+    if (error instanceof StorageError) {
       throw error;
     }
     throw new StorageError(StorageErrorCode.DatabaseFailure, message, error);
   }
 }
 
-/** Активная заявка или `null`, если её ещё не создали. */
-export function getActiveApplication(): Promise<Application | null> {
+/** Все заявки, недавно открытые сверху. Пустой список — заявок ещё нет. */
+export function listApplications(): Promise<readonly Application[]> {
+  return guarded('Не удалось прочитать список заявок', async () => {
+    const db = await getDb();
+    const result = await db.execute(SELECT_APPLICATIONS);
+    return result.rows.map(toApplication);
+  });
+}
+
+/**
+ * Заявка, которую открывали последней, — её приложение показывает при
+ * запуске (ADR-0015). `null`, если заявок ещё нет.
+ */
+export function getLastOpenedApplication(): Promise<Application | null> {
   return guarded('Не удалось прочитать заявку', async () => {
     const db = await getDb();
-    const result = await db.execute(SELECT_ACTIVE_APPLICATION);
+    const result = await db.execute(SELECT_LAST_OPENED_APPLICATION);
     const row = result.rows[0];
     return row === undefined ? null : toApplication(row);
+  });
+}
+
+/**
+ * Заявка по идентификатору или `null`, если её нет.
+ *
+ * `null` — обычное дело, а не сбой: восстановленное состояние навигации
+ * переживает выгрузку процесса и может указывать на заявку, удалённую с
+ * другого экрана.
+ */
+export function getApplicationById(
+  applicationId: ApplicationId,
+): Promise<Application | null> {
+  return guarded('Не удалось прочитать заявку', async () => {
+    const db = await getDb();
+    const result = await db.execute(SELECT_APPLICATION_BY_ID, [applicationId]);
+    const row = result.rows[0];
+    return row === undefined ? null : toApplication(row);
+  });
+}
+
+/**
+ * Отмечает заявку открытой — от этой отметки зависит, что показать при
+ * следующем запуске и в каком порядке идёт список заявок.
+ *
+ * Вызывающий не обязан ждать результат и не должен показывать ошибку:
+ * потерянная отметка означает лишь другой порядок в списке, и ронять из-за
+ * неё открытый чек-лист нельзя (ADR-0015).
+ */
+export function markApplicationOpened(
+  applicationId: ApplicationId,
+): Promise<void> {
+  return guarded('Не удалось отметить заявку открытой', async () => {
+    const db = await getDb();
+    await db.execute(MARK_APPLICATION_OPENED, [
+      new Date().toISOString(),
+      applicationId,
+    ]);
   });
 }
 
@@ -274,11 +334,11 @@ export function getActiveApplication(): Promise<Application | null> {
  * Записывает заявку и её пункты одной транзакцией: заявка без пунктов
  * или половина пунктов в базе не остаются ни при каком сбое.
  *
- * Проверка «заявки ещё нет» — внутри той же транзакции. op-sqlite
- * выполняет транзакции по очереди, поэтому два одновременных вызова не
- * создадут две заявки.
+ * Созданная заявка сразу считается последней открытой — на неё и
+ * переходит приложение.
  *
- * @throws ApplicationAlreadyExistsError если заявка уже есть.
+ * Одноимённые заявки не запрещены: название человек пишет сам, и
+ * «ВНЖ Сербия» для двух членов семьи — нормальный случай.
  */
 export function createApplication(input: NewApplication): Promise<Application> {
   return guarded('Не удалось сохранить заявку', async () => {
@@ -286,12 +346,7 @@ export function createApplication(input: NewApplication): Promise<Application> {
     const now = new Date().toISOString();
 
     await withTransaction(async tx => {
-      const existing = await tx.execute(SELECT_ANY_APPLICATION);
-      if (existing.rows.length > 0) {
-        throw new ApplicationAlreadyExistsError();
-      }
-
-      await tx.execute(INSERT_APPLICATION, [id, input.title, now, now]);
+      await tx.execute(INSERT_APPLICATION, [id, input.title, now, now, now]);
 
       for (const [position, label] of input.itemLabels.entries()) {
         await tx.execute(INSERT_CHECKLIST_ITEM, [
