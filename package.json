@@ -11,10 +11,12 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@cantoo/pdf-lib": "^2.9.1",
+    "@cantoo/pdf-lib": "^2.11.1",
     "@dr.pogodin/react-native-fs": "^2.40.2",
     "@noble/ciphers": "^2.4.0",
+    "@noble/hashes": "^2.4.0",
     "@op-engineering/op-sqlite": "^18.2.0",
+    "@pdf-lib/fontkit": "^1.1.1",
     "@react-native-documents/picker": "^12.0.2",
     "@react-native/new-app-screen": "0.87.1",
     "@react-navigation/native": "^7.4.1",
@@ -27,6 +29,7 @@
     "react-native-nitro-modules": "^0.37.1",
     "react-native-safe-area-context": "^5.5.2",
     "react-native-screens": "^4.28.0",
+    "react-native-share": "^12.3.1",
     "react-native-vision-camera": "^5.2.3",
     "styled-components": "^6.5.3"
   },

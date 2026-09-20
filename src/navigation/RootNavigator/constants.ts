@@ -6,6 +6,9 @@ export const LOADING: BootstrapState = { status: 'loading' };
 export const SCREEN_TITLES = {
   applicationList: 'Заявки',
   createApplication: 'Новая заявка',
+  renameApplication: 'Переименовать заявку',
+  documentLibrary: 'Библиотека документов',
+  pickDocument: 'Выбор файла',
 } as const;
 
 /** Контракт корневого экрана для тестов и e2e. */

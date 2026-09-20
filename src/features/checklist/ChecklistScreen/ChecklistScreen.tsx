@@ -5,13 +5,17 @@
  * она приходит готовой. Название показывает шапка навигации, поэтому
  * своего заголовка у экрана нет (ADR-0014).
  *
- * Под списком — сброс заявки: если список документов при создании
- * составлен неверно, заявку удаляют и создают заново. Сброс необратим,
- * поэтому сначала диалог с тем, что именно пропадёт (ADR-0012).
+ * Под списком — удаление заявки: если список документов при создании
+ * составлен неверно, заявку удаляют и создают заново. Удаление необратимо
+ * и показывает диалог с тем, что именно пропадёт, а что останется
+ * (ADR-0016). То же действие есть в списке заявок.
  *
- * У каждого пункта — прикрепление файла (`attachDocument.ts`) и удаление
- * прикреплённого (`detachDocument.ts`). Пикер в системе один, а удаление
- * необратимо, поэтому одновременно идёт только одно действие.
+ * У каждого пункта — прикрепление файла с устройства
+ * (`attachDocument.ts`), прикрепление уже загруженного из библиотеки
+ * (отдельный экран, сюда приходит колбэком) и открепление
+ * (`detachDocumentFromItem` в репозитории: открепление — это только
+ * запись в БД, файл не трогается). Пикер в системе один, поэтому
+ * одновременно идёт только одно действие.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -26,46 +30,68 @@ import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
+import {
+  buildPackage,
+  preparePackagePlan,
+  sharePackage,
+  type PackageBuildResult,
+} from '../../package';
 import { ChecklistItemRow } from '../ChecklistItemRow';
 import { pickAndAttachDocument } from '../attachDocument';
-import { deleteAttachedDocument } from '../detachDocument';
 import { describeError } from '../errorMessages';
 import {
   checklistItemKeyOf,
+  isAttached,
   withAttachedDocument,
   withoutDocument,
   type AttachedDocument,
   type ChecklistItem,
   type ChecklistItemId,
   type DocumentId,
-  type ResetImpact,
+  type ApplicationDeletionImpact,
 } from '../model';
 import {
+  applicationDeletionConfirmation,
+  documentDetachConfirmation,
+} from '../confirmations';
+import {
   deleteApplication,
-  getResetImpact,
+  detachDocumentFromItem,
+  getApplicationDeletionImpact,
   listChecklistItems,
 } from '../repository';
-import { documentDeletionConfirmation, resetConfirmation } from '../reset';
 import {
   ATTACH_IDLE,
-  DELETE_IDLE,
+  DEDUPLICATION_NOTICE,
+  DETACH_IDLE,
+  PACKAGE_IDLE,
+  PACKAGE_PREPARING,
   LOADING,
   RESET_IDLE,
   RESET_WORKING,
   TEST_IDS,
 } from './constants';
-import { ErrorText, Footer, Header, Summary, listContentStyle } from './styles';
+import {
+  ErrorText,
+  Footer,
+  Header,
+  NoticeText,
+  PackageBlock,
+  Summary,
+  listContentStyle,
+} from './styles';
 import type {
   AttachState,
   ChecklistScreenProps,
-  DeleteState,
+  DetachState,
   ItemsState,
+  PackageState,
   ResetState,
 } from './types';
 
 /** Сообщение о неудаче — только для того пункта, где она случилась. */
 function errorOfItem(
-  state: AttachState | DeleteState,
+  state: AttachState | DetachState,
   itemId: ChecklistItemId,
 ): string | null {
   return state.status === 'failed' && state.itemId === itemId
@@ -73,24 +99,45 @@ function errorOfItem(
     : null;
 }
 
+/** То же для сообщения об успешном, но необычном исходе. */
+function noticeOfItem(
+  state: AttachState,
+  itemId: ChecklistItemId,
+): string | null {
+  return state.status === 'notice' && state.itemId === itemId
+    ? state.message
+    : null;
+}
+
 export function ChecklistScreen({
   application,
+  isFocused = true,
+  onPickFromLibrary,
   onReset,
 }: ChecklistScreenProps) {
   const theme = useTheme();
   const [state, setState] = useState<ItemsState>(LOADING);
   const [attempt, setAttempt] = useState(0);
   const [resetState, setResetState] = useState<ResetState>(RESET_IDLE);
+  const [packageState, setPackageState] =
+    useState<PackageState>(PACKAGE_IDLE);
+  // Сборка идёт долго, и второе нажатие успевает раньше, чем доедет
+  // состояние: два пакета разом писали бы в один и тот же файл.
+  const buildingRef = useRef(false);
   const [attachState, setAttachState] = useState<AttachState>(ATTACH_IDLE);
   // Состояние доезжает до следующего рендера, а второе нажатие может
   // успеть раньше и открыть пикер повторно. Ref закрывает это синхронно.
   const attachingRef = useRef(false);
-  const [deleteState, setDeleteState] = useState<DeleteState>(DELETE_IDLE);
+  const [detachState, setDetachState] = useState<DetachState>(DETACH_IDLE);
   // Та же защита, что и у прикрепления: подтверждение в диалоге можно
   // успеть нажать дважды.
-  const deletingRef = useRef(false);
+  const detachingRef = useRef(false);
 
   useEffect(() => {
+    if (!isFocused) {
+      return undefined;
+    }
+
     // Ответ, пришедший после размонтирования или после повторной
     // попытки, не должен перезаписать актуальное состояние.
     let cancelled = false;
@@ -111,7 +158,7 @@ export function ChecklistScreen({
     return () => {
       cancelled = true;
     };
-  }, [application.id, attempt]);
+  }, [application.id, isFocused, attempt]);
 
   const retry = useCallback(() => {
     setState(LOADING);
@@ -128,9 +175,10 @@ export function ChecklistScreen({
     try {
       const result = await pickAndAttachDocument(itemId);
 
-      if (result.status === 'attached') {
-        // Файл уже в базе — список обновляется на месте, без перечитывания
-        // и мигания индикатора загрузки.
+      // Файл уже в базе — список обновляется на месте, без перечитывания
+      // и мигания индикатора загрузки. `already-attached` список не
+      // трогает: этот документ у пункта уже есть.
+      if (result.status === 'attached' || result.status === 'reused') {
         setState(current =>
           current.status === 'loaded'
             ? {
@@ -146,7 +194,26 @@ export function ChecklistScreen({
         AccessibilityInfo.announceForAccessibility('Файл прикреплён');
       }
 
-      setAttachState(ATTACH_IDLE);
+      // Дедупликация — не ошибка, но и не обычное прикрепление: файл не
+      // загружался заново, и об этом нужно сказать (ADR-0018).
+      if (result.status === 'reused') {
+        setAttachState({
+          status: 'notice',
+          itemId,
+          message: DEDUPLICATION_NOTICE.reused,
+        });
+      } else if (result.status === 'already-attached') {
+        AccessibilityInfo.announceForAccessibility(
+          DEDUPLICATION_NOTICE.alreadyAttached,
+        );
+        setAttachState({
+          status: 'notice',
+          itemId,
+          message: DEDUPLICATION_NOTICE.alreadyAttached,
+        });
+      } else {
+        setAttachState(ATTACH_IDLE);
+      }
     } catch (error) {
       setAttachState({
         status: 'failed',
@@ -158,16 +225,16 @@ export function ChecklistScreen({
     }
   }, []);
 
-  const confirmDelete = useCallback(
+  const confirmDetach = useCallback(
     async (itemId: ChecklistItemId, documentId: DocumentId) => {
-      if (deletingRef.current) {
+      if (detachingRef.current) {
         return;
       }
-      deletingRef.current = true;
-      setDeleteState({ status: 'working', itemId, documentId });
+      detachingRef.current = true;
+      setDetachState({ status: 'working', itemId, documentId });
 
       try {
-        await deleteAttachedDocument(itemId, documentId);
+        await detachDocumentFromItem(itemId, documentId);
         setState(current =>
           current.status === 'loaded'
             ? {
@@ -176,22 +243,22 @@ export function ChecklistScreen({
               }
             : current,
         );
-        AccessibilityInfo.announceForAccessibility('Файл удалён');
-        setDeleteState(DELETE_IDLE);
+        AccessibilityInfo.announceForAccessibility('Файл откреплён');
+        setDetachState(DETACH_IDLE);
       } catch (error) {
-        setDeleteState({
+        setDetachState({
           status: 'failed',
           itemId,
           message: describeError(error),
         });
       } finally {
-        deletingRef.current = false;
+        detachingRef.current = false;
       }
     },
     [],
   );
 
-  const handleDeleteFile = useCallback(
+  const handleDetachFile = useCallback(
     (itemId: ChecklistItemId, document: AttachedDocument) => {
       const item =
         state.status === 'loaded'
@@ -202,9 +269,9 @@ export function ChecklistScreen({
         return;
       }
 
-      // Удаление необратимо, и диалог говорит об этом прямо — слова
-      // «открепить» здесь быть не должно (ADR-0013).
-      const { title, message } = documentDeletionConfirmation(
+      // Файл остаётся на устройстве, но найти его снова будет негде,
+      // пока нет экрана библиотеки — диалог говорит об этом прямо.
+      const { title, message } = documentDetachConfirmation(
         item.label,
         document,
         item.documents.length === 1,
@@ -213,15 +280,15 @@ export function ChecklistScreen({
       Alert.alert(title, message, [
         { text: 'Отмена', style: 'cancel' },
         {
-          text: 'Удалить файл',
+          text: 'Открепить',
           style: 'destructive',
           onPress: () => {
-            confirmDelete(itemId, document.id);
+            confirmDetach(itemId, document.id);
           },
         },
       ]);
     },
-    [state, confirmDelete],
+    [state, confirmDetach],
   );
 
   const confirmReset = useCallback(async () => {
@@ -238,9 +305,9 @@ export function ChecklistScreen({
   const handleResetPress = useCallback(async () => {
     setResetState(RESET_WORKING);
 
-    let impact: ResetImpact;
+    let impact: ApplicationDeletionImpact;
     try {
-      impact = await getResetImpact(application.id);
+      impact = await getApplicationDeletionImpact(application.id);
     } catch (error) {
       setResetState({ status: 'failed', message: describeError(error) });
       return;
@@ -248,12 +315,15 @@ export function ChecklistScreen({
 
     setResetState(RESET_IDLE);
 
-    const { title, message } = resetConfirmation(application.title, impact);
+    const { title, message } = applicationDeletionConfirmation(
+      application.title,
+      impact,
+    );
     Alert.alert(title, message, [
       // Первой и с ролью cancel: случайное касание не должно удалять.
       { text: 'Отмена', style: 'cancel' },
       {
-        text: 'Сбросить',
+        text: 'Удалить',
         style: 'destructive',
         onPress: () => {
           confirmReset();
@@ -262,11 +332,54 @@ export function ChecklistScreen({
     ]);
   }, [application.id, application.title, confirmReset]);
 
+  const share = useCallback(async (result: PackageBuildResult) => {
+    try {
+      await sharePackage(result);
+    } catch (error) {
+      setPackageState({ status: 'failed', message: describeError(error) });
+    }
+  }, []);
+
+  const handleBuildPackage = useCallback(async () => {
+    if (buildingRef.current) {
+      return;
+    }
+    buildingRef.current = true;
+    setPackageState(PACKAGE_PREPARING);
+
+    try {
+      // План считается до сборки: он же проверяет, хватит ли места.
+      const plan = await preparePackagePlan(application.id);
+      setPackageState({
+        status: 'building',
+        processed: 0,
+        total: plan.includedDocumentCount + plan.unsupportedDocumentCount,
+      });
+
+      const result = await buildPackage(application, plan, progress => {
+        setPackageState({ status: 'building', ...progress });
+      });
+
+      setPackageState({ status: 'done', result });
+      AccessibilityInfo.announceForAccessibility('Пакет собран');
+      await share(result);
+    } catch (error) {
+      setPackageState({ status: 'failed', message: describeError(error) });
+    } finally {
+      buildingRef.current = false;
+    }
+  }, [application, share]);
+
   const total = state.status === 'loaded' ? state.items.length : 0;
+  const attachedCount =
+    state.status === 'loaded' ? state.items.filter(isAttached).length : 0;
+  const isBuildingPackage =
+    packageState.status === 'preparing' || packageState.status === 'building';
   const isResetting = resetState.status === 'working';
   const isAttaching = attachState.status === 'working';
-  const isDeleting = deleteState.status === 'working';
-  const isBusy = isAttaching || isDeleting || isResetting;
+  const isDetaching = detachState.status === 'working';
+  const isBusy =
+    isAttaching || isDetaching || isResetting || isBuildingPackage;
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChecklistItem>) => (
@@ -277,20 +390,30 @@ export function ChecklistScreen({
         isAttaching={
           attachState.status === 'working' && attachState.itemId === item.id
         }
-        deletingDocumentId={
-          deleteState.status === 'working' && deleteState.itemId === item.id
-            ? deleteState.documentId
+        detachingDocumentId={
+          detachState.status === 'working' && detachState.itemId === item.id
+            ? detachState.documentId
             : null
         }
         actionsDisabled={isBusy}
         actionError={
-          errorOfItem(attachState, item.id) ?? errorOfItem(deleteState, item.id)
+          errorOfItem(attachState, item.id) ?? errorOfItem(detachState, item.id)
         }
+        actionNotice={noticeOfItem(attachState, item.id)}
         onAttach={handleAttach}
-        onDeleteFile={handleDeleteFile}
+        onPickFromLibrary={onPickFromLibrary}
+        onDetachFile={handleDetachFile}
       />
     ),
-    [total, attachState, deleteState, isBusy, handleAttach, handleDeleteFile],
+    [
+      total,
+      attachState,
+      detachState,
+      isBusy,
+      handleAttach,
+      onPickFromLibrary,
+      handleDetachFile,
+    ],
   );
 
   const header = (
@@ -304,9 +427,64 @@ export function ChecklistScreen({
   if (state.status === 'loaded') {
     const footer = (
       <Footer>
+        <PackageBlock>
+          {/* Без «всё готово»: пакет собирается и при неполном
+              чек-листе, а решать, готов он или нет, человеку. */}
+          <Summary testID={TEST_IDS.packageSummary}>
+            {`Прикреплено ${attachedCount} из ${total} пунктов чек-листа`}
+          </Summary>
+
+          {packageState.status === 'building' ? (
+            <NoticeText
+              accessibilityLiveRegion="polite"
+              testID={TEST_IDS.packageProgress}
+            >
+              {`Обрабатывается ${packageState.processed} из ${packageState.total}`}
+            </NoticeText>
+          ) : null}
+
+          {packageState.status === 'done' ? (
+            <NoticeText
+              accessibilityLiveRegion="polite"
+              testID={TEST_IDS.packageResult}
+            >
+              {`Пакет собран: страниц — ${packageState.result.pageCount}`}
+            </NoticeText>
+          ) : null}
+
+          {packageState.status === 'failed' ? (
+            <ErrorText
+              accessibilityRole="alert"
+              accessibilityLiveRegion="polite"
+              testID={TEST_IDS.packageError}
+            >
+              {packageState.message}
+            </ErrorText>
+          ) : null}
+
+          <Button
+            label={isBuildingPackage ? 'Сборка…' : 'Собрать пакет'}
+            accessibilityLabel="Собрать все прикреплённые документы в один PDF-файл"
+            testID={TEST_IDS.packageButton}
+            disabled={isBusy}
+            onPress={handleBuildPackage}
+          />
+
+          {packageState.status === 'done' ? (
+            <Button
+              variant="secondary"
+              label="Отправить ещё раз"
+              accessibilityLabel="Отправить собранный пакет ещё раз"
+              testID={TEST_IDS.packageShareButton}
+              disabled={isBusy}
+              onPress={() => share(packageState.result)}
+            />
+          ) : null}
+        </PackageBlock>
+
         <Summary>
-          Список документов составлен неверно? Заявку можно сбросить и создать
-          заново.
+          Список документов составлен неверно? Заявку можно удалить и создать
+          заново — прикреплённые файлы останутся в библиотеке.
         </Summary>
 
         {resetState.status === 'failed' ? (
@@ -321,8 +499,8 @@ export function ChecklistScreen({
 
         <Button
           variant="danger"
-          label={isResetting ? 'Сброс…' : 'Сбросить заявку'}
-          accessibilityLabel="Сбросить заявку и создать её заново"
+          label={isResetting ? 'Удаление…' : 'Удалить заявку'}
+          accessibilityLabel="Удалить эту заявку"
           testID={TEST_IDS.resetButton}
           disabled={isBusy}
           onPress={handleResetPress}

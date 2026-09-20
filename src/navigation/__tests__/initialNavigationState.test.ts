@@ -14,10 +14,12 @@ const APPLICATION = {
   title: 'ВНЖ Сербия',
 };
 
-it('без заявок — только список', () => {
+it('без заявок — сразу создание заявки поверх пустого списка', () => {
+  // Первый запуск: список всё равно пуст, и делать в нём нечего, кроме
+  // создания. «Назад» при этом остаётся — ведёт в список (ADR-0015).
   expect(initialNavigationState(null)).toEqual({
-    index: 0,
-    routes: [{ name: 'ApplicationList' }],
+    index: 1,
+    routes: [{ name: 'ApplicationList' }, { name: 'CreateApplication' }],
   });
 });
 

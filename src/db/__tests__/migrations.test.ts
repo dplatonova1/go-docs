@@ -108,6 +108,36 @@ describe('MIGRATIONS', () => {
     ]);
   });
 
+  it('миграция 3 добавляет отпечаток содержимого с уникальным индексом', () => {
+    // ADR-0018: дедупликация держится на уникальности, а не только на
+    // проверке в коде прикрепления.
+    const third = MIGRATIONS.find(item => item.version === 3);
+    const sql = (third?.statements ?? []).join('\n');
+
+    expect(sql).toContain('ALTER TABLE documents ADD COLUMN content_hash TEXT');
+    expect(sql).toContain('CREATE UNIQUE INDEX idx_documents_content_hash');
+    expect(sql).toContain('ON documents(content_hash)');
+  });
+
+  it('внешние ключи покрыты индексами', () => {
+    // Без индекса по дочерней колонке каскадное удаление превращается в
+    // полный перебор таблицы на каждую удаляемую родительскую строку.
+    const sql = MIGRATIONS.flatMap(m => m.statements).join('\n');
+
+    // checklist_items.application_id — явный индекс.
+    expect(sql).toContain('CREATE INDEX idx_checklist_items_application_id');
+    expect(sql).toContain('ON checklist_items(application_id)');
+
+    // checklist_item_documents.document_id — явный индекс.
+    expect(sql).toContain('CREATE INDEX idx_cid_document_id');
+    expect(sql).toContain('ON checklist_item_documents(document_id)');
+
+    // checklist_item_documents.checklist_item_id — левый столбец
+    // составного первичного ключа: SQLite строит по нему индекс сам, и
+    // он же запрещает вторую связь того же документа с тем же пунктом.
+    expect(sql).toContain('PRIMARY KEY (checklist_item_id, document_id)');
+  });
+
   it('перечислимые столбцы защищены CHECK-ограничениями', () => {
     // Допустимые значения держатся на уровне БД, а не на аккуратности
     // вызывающего кода: опечатка 'complete' вместо 'completed'

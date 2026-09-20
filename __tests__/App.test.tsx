@@ -2,7 +2,7 @@
  * @format
  *
  * Smoke-тест корневого компонента: дерево собирается, провайдеры на
- * месте, и без заявок запуск приводит на список заявок.
+ * месте, и без заявок запуск приводит сразу на создание заявки.
  *
  * Хранилище заменено заглушками на нашей границе (db/client и
  * репозиторий), а не на уровне нативных библиотек: работа хранилища
@@ -32,18 +32,39 @@ jest.mock('../src/features/checklist/repository', () => ({
   listChecklistItems: jest.fn(),
   createApplication: jest.fn(),
   deleteApplication: jest.fn(),
-  getResetImpact: jest.fn(),
+  getApplicationDeletionImpact: jest.fn(),
+  detachDocumentFromItem: jest.fn(),
+  renameApplication: jest.fn(),
+  listLibraryDocuments: jest.fn().mockResolvedValue([]),
+  getDocumentUsage: jest.fn(),
+  attachLibraryDocumentToItem: jest.fn(),
+}));
+
+jest.mock('../src/features/library/deleteDocumentFromLibrary', () => ({
+  deleteDocumentFromLibrary: jest.fn(),
+}));
+
+// Библиотека документов тянет файловое хранилище ради превью, а оно —
+// нативные модули (Keychain, CSPRNG). Здесь проверяется только сборка
+// дерева.
+jest.mock('../src/storage/fs', () => ({
+  readFile: jest.fn(),
+  toRelativePath: (value: string) => value,
+}));
+
+// Сборка пакета тянет pdf-lib и файловое хранилище (нативные модули).
+// Её путь проверяется своими тестами; здесь нужен только экран.
+jest.mock('../src/features/package', () => ({
+  preparePackagePlan: jest.fn(),
+  buildPackage: jest.fn(),
+  sharePackage: jest.fn(),
 }));
 
 jest.mock('../src/features/checklist/attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
 }));
 
-jest.mock('../src/features/checklist/detachDocument', () => ({
-  deleteAttachedDocument: jest.fn(),
-}));
-
-test('без заявок открывает список заявок', async () => {
+test('без заявок открывает создание заявки', async () => {
   let tree!: ReactTestRenderer.ReactTestRenderer;
 
   await ReactTestRenderer.act(async () => {
@@ -51,7 +72,8 @@ test('без заявок открывает список заявок', async (
   });
 
   expect(
-    tree.root.findAll(node => node.props.testID === 'application-list-screen')
-      .length,
+    tree.root.findAll(
+      node => node.props.testID === 'create-application-screen',
+    ).length,
   ).toBeGreaterThan(0);
 });

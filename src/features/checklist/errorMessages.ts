@@ -32,6 +32,8 @@ const STORAGE_ERROR_MESSAGES = {
   [StorageErrorCode.FileFormatUnsupported]:
     'Файл создан более новой версией приложения. Обновите приложение.',
   [StorageErrorCode.FileTooLarge]: `Файл больше ${MAX_ATTACHMENT_MEGABYTES} МБ. Уменьшите его — например, сожмите PDF или сделайте фото с меньшим разрешением — и попробуйте снова.`,
+  [StorageErrorCode.NotEnoughSpace]:
+    'На устройстве не хватает свободного места. Освободите место и попробуйте снова.',
   [StorageErrorCode.DatabaseFailure]:
     'Не удалось обратиться к данным на устройстве. Попробуйте ещё раз.',
 } as const satisfies Record<StorageErrorCode, string>;
@@ -41,7 +43,7 @@ const ATTACHMENT_ERROR_MESSAGES = {
   'copy-failed':
     'Не удалось получить файл. Если он хранится в облаке, откройте его в приложении облака, чтобы он загрузился на телефон, и попробуйте снова.',
   unsupported:
-    'Этот файл нельзя прикрепить в таком виде. Сохраните его как PDF или изображение и попробуйте снова.',
+    'Прикрепить можно JPEG, PNG или PDF. Сохраните файл в одном из этих форматов и попробуйте снова.',
 } as const satisfies Record<AttachmentErrorCode, string>;
 
 const UNKNOWN_ERROR_MESSAGE = 'Непредвиденная ошибка. Попробуйте ещё раз.';

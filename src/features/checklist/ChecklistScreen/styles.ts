@@ -25,6 +25,18 @@ export const Footer = styled.View`
   margin-top: 16px;
 `;
 
+/** Блок сборки пакета: отделён от списка и от удаления заявки. */
+export const PackageBlock = styled.View`
+  gap: 8px;
+  margin-top: 16px;
+`;
+
+export const NoticeText = styled.Text`
+  ${textSize(14)}
+  font-family: ${FONTS.regular};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
 export const ErrorText = styled.Text`
   ${textSize(14)}
   font-family: ${FONTS.medium};

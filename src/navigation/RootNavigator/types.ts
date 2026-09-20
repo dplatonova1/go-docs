@@ -1,6 +1,9 @@
 import type { InitialState } from '@react-navigation/native';
 
-import type { ApplicationId } from '../../features/checklist/model';
+import type {
+  ApplicationId,
+  ChecklistItemId,
+} from '../../features/checklist/model';
 
 /**
  * Маршруты приложения и их параметры
@@ -15,6 +18,9 @@ export type RootStackParamList = {
   ApplicationList: undefined;
   Checklist: { applicationId: ApplicationId };
   CreateApplication: undefined;
+  RenameApplication: { applicationId: ApplicationId };
+  DocumentLibrary: undefined;
+  PickDocumentFromLibrary: { itemId: ChecklistItemId };
 };
 
 /**

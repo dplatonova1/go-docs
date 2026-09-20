@@ -1,34 +1,41 @@
 /**
  * Выбор файла для прикрепления к пункту чек-листа.
  *
- * Типы файлов не ограничиваются: в чек-листах встречаются сканы, фото,
- * PDF, docx, выписки в произвольных форматах, и заранее угадать, что
- * потребует ведомство, нельзя.
+ * Выбрать можно только JPEG, PNG и PDF (`ATTACHABLE_MIME_TYPES`):
+ * из них собирается итоговый пакет, а остальное пришлось бы
+ * конвертировать на устройстве. Фильтр пикера — первый рубеж: файл
+ * другого формата в приложение не попадает вообще, и отдельной ветки
+ * «этот формат мы не умеем» ниже по течению не нужно.
  *
  * Сразу после выбора — `keepLocalCopy`: выбранный файл может лежать в
  * облаке (Google Drive, Google Photos), и его `content://` URI не
  * переживёт перезапуск приложения. Копия получает байты немедленно, пока
  * доступ к файлу выдан. Сохранять исходный URI нельзя.
  *
- * Виртуальные файлы Android (Google Docs, Sheets) разрешены и
- * экспортируются — в PDF, если источник это умеет. Иначе пользователь
- * видел бы в пикере документ, который почему-то нельзя выбрать.
+ * Виртуальные файлы Android (документ в облаке без локального
+ * содержимого) разрешены и экспортируются — в PDF, если источник это
+ * умеет, иначе в другой разрешённый формат. Google Docs и Sheets после
+ * ограничения типов в пикере не появятся: у них свой MIME-тип. Но
+ * провайдер может отдать виртуальным и обычный PDF, поэтому обработка
+ * остаётся.
  *
  * Не проверено на устройстве: iOS в режиме `import` сам кладёт копию во
  * временный каталог приложения, и её удаление остаётся за системой.
  */
+
+import { Platform } from 'react-native';
 
 import {
   errorCodes,
   isErrorWithCode,
   keepLocalCopy,
   pick,
-  types,
   type DocumentPickerResponse,
   type LocalCopyResponse,
 } from '@react-native-documents/picker';
 
 import { AttachmentError } from './errors';
+import { ATTACHABLE_MIME_TYPES, isAttachableMimeType } from './model';
 
 export type PickedDocument = {
   /**
@@ -54,11 +61,37 @@ const LOCAL_COPY_FILE_NAME = 'picked-document';
 
 const PREFERRED_VIRTUAL_EXPORT_TYPE = 'application/pdf';
 
+/**
+ * Чем ограничить выбор в пикере.
+ *
+ * Android фильтрует по MIME-типу, iOS — по UTType: строка `image/jpeg`
+ * на iOS не совпадёт ни с чем, и пикер покажет пустой список. У
+ * библиотеки есть готовая константа только для PDF (`types.pdf`), для
+ * JPEG и PNG — нет, поэтому таблица целиком своя.
+ *
+ * Обе платформы перечислены явно, а не через `Platform.select`, чтобы
+ * список для каждой можно было проверить тестом.
+ */
+export const SELECTABLE_TYPES = {
+  android: ATTACHABLE_MIME_TYPES,
+  // HEIC — `public.heic`; он наследует `public.image`, но не
+  // `public.jpeg`, поэтому в этот список не попадает.
+  ios: ['public.jpeg', 'public.png', 'com.adobe.pdf'],
+} as const satisfies Record<'android' | 'ios', readonly string[]>;
+
+/**
+ * Формат, в который экспортировать виртуальный файл. PDF предпочтителен:
+ * он сохраняет вёрстку. Варианты за пределами разрешённых типов не
+ * рассматриваются — иначе ограничение обходилось бы через экспорт.
+ */
 function virtualExportType(picked: DocumentPickerResponse): string | undefined {
-  const options = picked.convertibleToMimeTypes ?? [];
+  const options = (picked.convertibleToMimeTypes ?? [])
+    .map(option => option.mimeType)
+    .filter(isAttachableMimeType);
+
   return (
-    options.find(option => option.mimeType === PREFERRED_VIRTUAL_EXPORT_TYPE)
-      ?.mimeType ?? options[0]?.mimeType
+    options.find(option => option === PREFERRED_VIRTUAL_EXPORT_TYPE) ??
+    options[0]
   );
 }
 
@@ -67,7 +100,11 @@ export async function pickDocument(): Promise<PickResult> {
 
   try {
     [picked] = await pick({
-      type: [types.allFiles],
+      type: [
+        ...(Platform.OS === 'ios'
+          ? SELECTABLE_TYPES.ios
+          : SELECTABLE_TYPES.android),
+      ],
       mode: 'import',
       allowMultiSelection: false,
       allowVirtualFiles: true,
@@ -82,6 +119,14 @@ export async function pickDocument(): Promise<PickResult> {
       }
     }
     throw new AttachmentError('picker-failed', error);
+  }
+
+  // Часть провайдеров на Android фильтр типов игнорирует, и выбрать
+  // можно что угодно — библиотека сообщает об этом флагом. На iOS он
+  // всегда true. Без этой проверки ограничение держалось бы только на
+  // добросовестности провайдера.
+  if (!picked.hasRequestedType) {
+    throw new AttachmentError('unsupported');
   }
 
   const exportType =

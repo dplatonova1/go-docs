@@ -5,14 +5,16 @@
  * пикер. Репозиторий работает настоящий, поэтому здесь видно, какие
  * запросы уходят в транзакцию и в каком порядке трогаются файл и база.
  *
- * Проверяется главное свойство обеих операций: не остаётся ни файла без
- * записи в БД, ни записи без файла.
+ * Проверяются главные свойства обеих операций: при прикреплении не
+ * остаётся ни файла без записи в БД, ни записи без файла; открепление же
+ * вообще не трогает ни файл, ни строку в `documents` — снимается только
+ * связь (ADR-0013, раздел «Обновление»).
  */
 
 import { StorageErrorCode, isStorageError } from '../../../storage/errors';
 import { attachPickedDocument } from '../attachDocument';
-import { deleteAttachedDocument } from '../detachDocument';
 import type { ChecklistItemId, DocumentId } from '../model';
+import { detachDocumentFromItem } from '../repository';
 
 jest.mock('../../../db/client', () => ({
   getDb: jest.fn(),
@@ -24,6 +26,7 @@ jest.mock('../../../db/ids', () => ({ newId: jest.fn() }));
 jest.mock('../../../storage/fs', () => ({
   writeFile: jest.fn(),
   deleteFile: jest.fn(),
+  assertEnoughSpace: jest.fn(),
   toRelativePath: (value: string) => value,
 }));
 
@@ -101,18 +104,36 @@ beforeEach(() => {
   fs.deleteFile.mockImplementation(async (path: string) => {
     log.push(`delete-file ${path}`);
   });
+  fs.assertEnoughSpace.mockResolvedValue(undefined);
+  // Поиск по отпечатку идёт вне транзакции, своим соединением: до
+  // записи такого документа ещё нет.
+  client.getDb.mockResolvedValue({
+    execute: jest.fn().mockResolvedValue({ rows: [] }),
+  });
 });
 
 describe('прикрепление файла', () => {
-  it('успех: файл записан, затем три записи в одной транзакции', async () => {
-    mockDatabase(() => []);
+  /** Поиск по отпечатку до записи ничего не находит, после — нашу строку. */
+  function rowsForAttach(sql: string): Rows {
+    return sql.includes('WHERE content_hash = ?')
+      ? [{ id: 'doc-1', original_filename: 'Паспорт.pdf' }]
+      : [];
+  }
 
-    const document = await attachPickedDocument(ITEM_ID, PICKED);
+  it('успех: файл записан, затем записи в одной транзакции', async () => {
+    mockDatabase(rowsForAttach);
 
-    expect(document).toEqual({ id: 'doc-1', name: 'Паспорт.pdf' });
+    const result = await attachPickedDocument(ITEM_ID, PICKED);
+
+    expect(result).toEqual({
+      status: 'attached',
+      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+    });
     expect(log).toEqual([
       `write-file ${FILE_PATH}`,
-      'INSERT INTO documents',
+      'INSERT OR IGNORE',
+      'SELECT id, original_filename',
+      'SELECT 1 FROM',
       'INSERT INTO checklist_item_documents',
       'UPDATE checklist_items SET',
       'COMMIT',
@@ -122,7 +143,7 @@ describe('прикрепление файла', () => {
   });
 
   it('сбой в транзакции после записи файла — файл удаляется с диска', async () => {
-    mockDatabase(() => [], 'INSERT INTO checklist_item_documents');
+    mockDatabase(rowsForAttach, 'INSERT INTO checklist_item_documents');
 
     const error = await attachPickedDocument(ITEM_ID, PICKED).catch(
       (e: unknown) => e,
@@ -136,57 +157,41 @@ describe('прикрепление файла', () => {
   });
 });
 
-describe('удаление прикреплённого файла', () => {
-  function rowsForDetach(sql: string): Rows {
-    if (sql.startsWith('SELECT file_path')) {
-      return [{ file_path: FILE_PATH }];
-    }
-    // Ни других связей у документа, ни других файлов у пункта.
-    return [];
-  }
+describe('открепление файла от пункта', () => {
+  it('снимается только связь: ни documents, ни файл не трогаются', async () => {
+    mockDatabase(() => []);
 
-  it('успех: связь, запись документа и файл — все три части', async () => {
-    mockDatabase(rowsForDetach);
-
-    await deleteAttachedDocument(ITEM_ID, DOCUMENT_ID);
+    await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID);
 
     expect(log).toEqual([
-      'SELECT file_path FROM',
       'DELETE FROM checklist_item_documents',
-      'SELECT 1 FROM',
-      'DELETE FROM documents',
       'SELECT 1 FROM',
       'UPDATE checklist_items SET',
       'COMMIT',
-      `delete-file ${FILE_PATH}`,
     ]);
+    expect(fs.deleteFile).not.toHaveBeenCalled();
   });
 
-  it('сбой на удалении документа — транзакция откатывается, файл цел', async () => {
-    mockDatabase(rowsForDetach, 'DELETE FROM documents');
+  it('у пункта остались другие файлы — статус не понижается', async () => {
+    mockDatabase(sql =>
+      sql.includes('WHERE checklist_item_id = ?') ? [{ 1: 1 }] : [],
+    );
 
-    const error = await deleteAttachedDocument(ITEM_ID, DOCUMENT_ID).catch(
+    await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID);
+
+    expect(log).not.toContain('UPDATE checklist_items SET');
+    expect(log).toContain('COMMIT');
+  });
+
+  it('сбой на снятии связи — транзакция откатывается, файл цел', async () => {
+    mockDatabase(() => [], 'DELETE FROM checklist_item_documents');
+
+    const error = await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID).catch(
       (e: unknown) => e,
     );
 
     expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
     expect(log).not.toContain('COMMIT');
-    // Файл не тронут: связь и запись документа остались в базе.
-    expect(fs.deleteFile).not.toHaveBeenCalled();
-  });
-
-  it('документ прикреплён к другому пункту — запись и файл сохраняются', async () => {
-    mockDatabase(sql =>
-      sql.startsWith('SELECT file_path')
-        ? [{ file_path: FILE_PATH }]
-        : sql.includes('WHERE document_id = ?')
-        ? [{ 1: 1 }]
-        : [],
-    );
-
-    await deleteAttachedDocument(ITEM_ID, DOCUMENT_ID);
-
-    expect(log).not.toContain('DELETE FROM documents');
     expect(fs.deleteFile).not.toHaveBeenCalled();
   });
 });

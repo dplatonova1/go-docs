@@ -17,11 +17,14 @@ import { ActivityIndicator, useColorScheme } from 'react-native';
 import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../components/Button';
-import { Screen } from '../../components/Screen';
+import { ALL_EDGES, Screen } from '../../components/Screen';
 import {
   ApplicationListRoute,
   ChecklistRoute,
   CreateApplicationRoute,
+  DocumentLibraryRoute,
+  PickDocumentFromLibraryRoute,
+  RenameApplicationRoute,
 } from '../routes';
 import { SCREEN_TITLES, TEST_IDS } from './constants';
 import { toNavigationTheme } from './navigationTheme';
@@ -44,7 +47,13 @@ export function RootNavigator() {
   switch (state.status) {
     case 'loading':
       return (
-        <Screen scrollable={false} testID={TEST_IDS.loading}>
+        // Экраны до `NavigationContainer`: шапки над ними нет, вырез
+        // они обходят сами.
+        <Screen
+          scrollable={false}
+          edges={ALL_EDGES}
+          testID={TEST_IDS.loading}
+        >
           <Centered>
             <ActivityIndicator
               size="large"
@@ -57,7 +66,7 @@ export function RootNavigator() {
 
     case 'failed':
       return (
-        <Screen testID={TEST_IDS.failed}>
+        <Screen edges={ALL_EDGES} testID={TEST_IDS.failed}>
           <Title accessibilityRole="header">Данные недоступны</Title>
           <Message accessibilityRole="alert" accessibilityLiveRegion="polite">
             {state.message}
@@ -90,6 +99,26 @@ export function RootNavigator() {
               name="CreateApplication"
               component={CreateApplicationRoute}
               options={{ title: SCREEN_TITLES.createApplication }}
+            />
+            <Stack.Screen
+              name="DocumentLibrary"
+              component={DocumentLibraryRoute}
+              options={{ title: SCREEN_TITLES.documentLibrary }}
+            />
+            <Stack.Screen
+              name="PickDocumentFromLibrary"
+              component={PickDocumentFromLibraryRoute}
+              options={{ title: SCREEN_TITLES.pickDocument }}
+            />
+            {/* Модально: переименование — короткий шаг поверх списка, из
+                которого возвращаются туда же. */}
+            <Stack.Screen
+              name="RenameApplication"
+              component={RenameApplicationRoute}
+              options={{
+                title: SCREEN_TITLES.renameApplication,
+                presentation: 'modal',
+              }}
             />
           </Stack.Navigator>
         </NavigationContainer>

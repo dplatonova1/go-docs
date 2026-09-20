@@ -375,19 +375,58 @@ describe('attachDocumentToItem', () => {
     originalFilename: 'Паспорт.pdf',
     mimeType: 'application/pdf',
     sizeBytes: 2048,
+    contentHash: 'a'.repeat(64),
   };
 
-  it('документ, связь и отметка пункта — одной транзакцией, параметрами', async () => {
-    const tx = mockTransaction([]);
+  /**
+   * Транзакция прикрепления. `storedRow` — что вернёт поиск по
+   * отпечатку после вставки: своя строка (обычный случай) или чужая
+   * (дедупликация), `existingLink` — была ли уже связь с пунктом.
+   */
+  function mockAttachTransaction(options: {
+    storedRow?: Record<string, unknown> | null;
+    existingLink?: Rows;
+  }) {
+    const stored =
+      options.storedRow === undefined
+        ? { id: 'doc-1', original_filename: 'Паспорт.pdf' }
+        : options.storedRow;
 
-    await attachDocumentToItem(ATTACHMENT);
+    const tx = {
+      execute: jest.fn<Promise<{ rows: Rows }>, [string, unknown[]?]>(
+        async sql => {
+          if (sql.includes('WHERE content_hash = ?')) {
+            return { rows: stored === null ? [] : [stored] };
+          }
+          if (sql.startsWith('SELECT 1 FROM checklist_item_documents')) {
+            return { rows: options.existingLink ?? [] };
+          }
+          return { rows: [] };
+        },
+      ),
+    };
+    client.withTransaction.mockImplementation(
+      async (fn: (t: typeof tx) => Promise<unknown>) => fn(tx),
+    );
+    return tx;
+  }
+
+  it('документ, связь и отметка пункта — одной транзакцией, параметрами', async () => {
+    const tx = mockAttachTransaction({});
+
+    await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
+      status: 'created',
+      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+    });
 
     expect(client.withTransaction).toHaveBeenCalledTimes(1);
     const calls = tx.execute.mock.calls;
-    expect(calls.map(([sql]) => sql.split(' ').slice(0, 3).join(' '))).toEqual([
-      'INSERT INTO documents',
-      'INSERT INTO checklist_item_documents',
-      'UPDATE checklist_items SET',
+    expect(calls.map(([sql]) => sql.split(' ').slice(0, 4).join(' '))).toEqual([
+      'INSERT OR IGNORE INTO',
+      'SELECT id, original_filename FROM',
+      'SELECT 1 FROM checklist_item_documents',
+      'INSERT INTO checklist_item_documents (checklist_item_id,',
+      'UPDATE checklist_items SET status',
     ]);
     expect(calls[0]?.[1]).toEqual([
       'doc-1',
@@ -395,13 +434,57 @@ describe('attachDocumentToItem', () => {
       'documents/doc-1',
       'application/pdf',
       2048,
+      'a'.repeat(64),
       expect.any(String),
       expect.any(String),
     ]);
-    expect(calls[1]?.[1]).toEqual(['item-1', 'doc-1', expect.any(String)]);
-    expect(calls[2]?.[1]).toEqual([expect.any(String), 'item-1']);
+    expect(calls[3]?.[1]).toEqual(['item-1', 'doc-1', expect.any(String)]);
+    expect(calls[4]?.[1]).toEqual([expect.any(String), 'item-1']);
     // Имя файла — только параметром, в текст SQL оно не попадает.
     expect(calls.some(([sql]) => sql.includes('Паспорт'))).toBe(false);
+  });
+
+  it('гонка по content_hash: вставка проигнорирована — связь с чужой строкой', async () => {
+    // Документ с таким содержимым успели записать между проверкой и
+    // транзакцией: в базе он, а не наш (ADR-0018).
+    const tx = mockAttachTransaction({
+      storedRow: { id: 'doc-0', original_filename: 'Паспорт (старый).pdf' },
+    });
+
+    await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
+      status: 'reused',
+      document: { id: 'doc-0', name: 'Паспорт (старый).pdf' },
+    });
+
+    // Связь создаётся с найденным документом, а не с нашим id.
+    const link = tx.execute.mock.calls.find(([sql]) =>
+      sql.startsWith('INSERT INTO checklist_item_documents'),
+    );
+    expect(link?.[1]).toEqual(['item-1', 'doc-0', expect.any(String)]);
+  });
+
+  it('документ уже прикреплён к этому пункту — второй связи не будет', async () => {
+    const tx = mockAttachTransaction({ existingLink: [{ 1: 1 }] });
+
+    await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
+      status: 'already-attached',
+      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+    });
+
+    expect(
+      tx.execute.mock.calls.some(([sql]) =>
+        sql.startsWith('INSERT INTO checklist_item_documents'),
+      ),
+    ).toBe(false);
+  });
+
+  it('вставку проигнорировали, а документа нет — StorageError, а не тишина', async () => {
+    // Конфликт по другому ограничению: пункт остался бы без файла,
+    // молчать об этом нельзя.
+    mockAttachTransaction({ storedRow: null });
+
+    const error = await failureOf(() => attachDocumentToItem(ATTACHMENT));
+    expect(isStorageError(error, StorageErrorCode.DatabaseFailure)).toBe(true);
   });
 
   it('транзакция упала (например, пункт уже удалён) — StorageError', async () => {
@@ -418,23 +501,13 @@ describe('detachDocumentFromItem', () => {
   const DOCUMENT_ID = 'doc-1' as DocumentId;
 
   /**
-   * Транзакция удаления. `otherLinks` — остались ли у документа связи с
-   * другими пунктами, `remainingOfItem` — остались ли файлы у пункта.
+   * Транзакция открепления. `remainingOfItem` — остались ли у пункта
+   * другие файлы.
    */
-  function mockDetachTransaction(options: {
-    path?: Rows;
-    otherLinks?: Rows;
-    remainingOfItem?: Rows;
-  }) {
+  function mockDetachTransaction(options: { remainingOfItem?: Rows } = {}) {
     const tx = {
       execute: jest.fn<Promise<{ rows: Rows }>, [string, unknown[]?]>(
         async sql => {
-          if (sql.startsWith('SELECT file_path')) {
-            return { rows: options.path ?? [{ file_path: 'documents/doc-1' }] };
-          }
-          if (sql.includes('WHERE document_id = ?')) {
-            return { rows: options.otherLinks ?? [] };
-          }
           if (sql.includes('WHERE checklist_item_id = ?')) {
             return { rows: options.remainingOfItem ?? [] };
           }
@@ -448,39 +521,47 @@ describe('detachDocumentFromItem', () => {
     return tx;
   }
 
-  it('связь, документ и статус пункта — одной транзакцией; путь файла наружу', async () => {
-    const tx = mockDetachTransaction({});
+  it('снимает только связь и понижает статус пункта — одной транзакцией', async () => {
+    const tx = mockDetachTransaction();
 
-    await expect(detachDocumentFromItem(ITEM_ID, DOCUMENT_ID)).resolves.toBe(
-      'documents/doc-1',
-    );
+    await expect(
+      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
+    ).resolves.toBeUndefined();
 
     expect(client.withTransaction).toHaveBeenCalledTimes(1);
     const calls = tx.execute.mock.calls;
     expect(calls.map(([sql]) => sql.split(' ').slice(0, 3).join(' '))).toEqual([
-      'SELECT file_path FROM',
       'DELETE FROM checklist_item_documents',
-      'SELECT 1 FROM',
-      'DELETE FROM documents',
       'SELECT 1 FROM',
       'UPDATE checklist_items SET',
     ]);
-    expect(calls[1]?.[1]).toEqual([ITEM_ID, DOCUMENT_ID]);
-    expect(calls[3]?.[1]).toEqual([DOCUMENT_ID]);
-    expect(calls[5]?.[1]).toEqual([expect.any(String), ITEM_ID]);
+    expect(calls[0]?.[1]).toEqual([ITEM_ID, DOCUMENT_ID]);
+    expect(calls[2]?.[1]).toEqual([expect.any(String), ITEM_ID]);
   });
 
-  it('документ прикреплён к другому пункту — не удаляется, файл остаётся', async () => {
-    const tx = mockDetachTransaction({ otherLinks: [{ 1: 1 }] });
+  it('запись документа не трогается — документ остаётся в библиотеке', async () => {
+    const tx = mockDetachTransaction();
 
-    await expect(
-      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
-    ).resolves.toBeNull();
+    await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID);
 
     const statements = tx.execute.mock.calls.map(([sql]) => sql);
-    expect(
-      statements.some(sql => sql.startsWith('DELETE FROM documents')),
-    ).toBe(false);
+    // Ни удаления документа, ни чтения пути к файлу: открепление — это
+    // только связь (ADR-0010, ADR-0013 «Обновление»).
+    expect(statements.some(sql => sql.startsWith('DELETE FROM documents'))).toBe(
+      false,
+    );
+    expect(statements.some(sql => sql.includes('file_path'))).toBe(false);
+  });
+
+  it('связи документа с другими пунктами не проверяются — они не нужны', async () => {
+    const tx = mockDetachTransaction();
+
+    await detachDocumentFromItem(ITEM_ID, DOCUMENT_ID);
+
+    const statements = tx.execute.mock.calls.map(([sql]) => sql);
+    expect(statements.some(sql => sql.includes('WHERE document_id = ?'))).toBe(
+      false,
+    );
   });
 
   it('у пункта остались файлы — статус не понижается', async () => {
@@ -492,14 +573,6 @@ describe('detachDocumentFromItem', () => {
     expect(
       statements.some(sql => sql.startsWith('UPDATE checklist_items')),
     ).toBe(false);
-  });
-
-  it('записи документа уже нет — связь всё равно снимается, файла нет', async () => {
-    mockDetachTransaction({ path: [] });
-
-    await expect(
-      detachDocumentFromItem(ITEM_ID, DOCUMENT_ID),
-    ).resolves.toBeNull();
   });
 
   it('сбой транзакции — StorageError', async () => {

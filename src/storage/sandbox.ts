@@ -23,6 +23,7 @@
 import {
   DocumentDirectoryPath,
   exists,
+  getFSInfo,
   mkdir,
   readFile as fsReadFile,
   unlink,
@@ -126,6 +127,26 @@ function resolveInsideSandbox(relativePath: RelativePath): string {
 function parentDirectoryOf(absolutePath: string): string | undefined {
   const lastSlash = absolutePath.lastIndexOf('/');
   return lastSlash <= 0 ? undefined : absolutePath.slice(0, lastSlash);
+}
+
+/**
+ * Сколько байт свободно на разделе приложения.
+ *
+ * Значение приблизительное: система может отдать его с задержкой, а
+ * место способен занять кто угодно между проверкой и записью. Годится
+ * для ответа «места заведомо не хватит», а не для точного планирования.
+ */
+export async function rawFreeSpace(): Promise<number> {
+  try {
+    const info = await getFSInfo();
+    return info.freeSpace;
+  } catch (error) {
+    throw new StorageError(
+      StorageErrorCode.DatabaseFailure,
+      'Не удалось узнать, сколько места свободно на устройстве',
+      error,
+    );
+  }
 }
 
 /** Записывает содержимое как есть, без шифрования. */

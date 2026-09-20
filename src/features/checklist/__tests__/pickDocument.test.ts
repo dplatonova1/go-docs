@@ -1,15 +1,20 @@
 /**
- * Выбор файла: любые типы, локальная копия сразу после выбора, ошибки
- * пикера — в понятные коды.
+ * Выбор файла: разрешённые типы, локальная копия сразу после выбора,
+ * ошибки пикера — в понятные коды.
+ *
+ * Платформа в тестах — iOS (умолчание jest-preset React Native), поэтому
+ * в вызов пикера уходит список UTType. Android-список проверяется по
+ * таблице `SELECTABLE_TYPES` отдельно: подменять `Platform.OS` ради
+ * одного массива дороже, чем сверить сам массив.
  */
 
 import { AttachmentError } from '../errors';
-import { pickDocument } from '../pickDocument';
+import { ATTACHABLE_MIME_TYPES } from '../model';
+import { SELECTABLE_TYPES, pickDocument } from '../pickDocument';
 
 jest.mock('@react-native-documents/picker', () => ({
   pick: jest.fn(),
   keepLocalCopy: jest.fn(),
-  types: { allFiles: '*/*' },
   errorCodes: {
     OPERATION_CANCELED: 'OPERATION_CANCELED',
     IN_PROGRESS: 'ASYNC_OP_IN_PROGRESS',
@@ -52,17 +57,62 @@ beforeEach(() => {
   ]);
 });
 
-it('любые типы файлов, один файл, режим import', async () => {
+it('только разрешённые типы, один файл, режим import', async () => {
   picker.pick.mockResolvedValue([CLOUD_FILE]);
 
   await pickDocument();
 
   expect(picker.pick).toHaveBeenCalledWith({
-    type: ['*/*'],
+    type: ['public.jpeg', 'public.png', 'com.adobe.pdf'],
     mode: 'import',
     allowMultiSelection: false,
     allowVirtualFiles: true,
   });
+});
+
+describe('список разрешённых типов', () => {
+  it('на Android — те же MIME-типы, что хранятся в базе', () => {
+    // Иначе фильтр пикера и проверка при сборке пакета разойдутся.
+    expect(SELECTABLE_TYPES.android).toEqual(ATTACHABLE_MIME_TYPES);
+    expect(ATTACHABLE_MIME_TYPES).toEqual([
+      'image/jpeg',
+      'image/png',
+      'application/pdf',
+    ]);
+  });
+
+  it('HEIC не разрешён ни на одной платформе', () => {
+    // Формат снимков iPhone по умолчанию: pdf-lib его не встраивает,
+    // поэтому он не должен быть выбираемым (см. model.ts).
+    const all: readonly string[] = [
+      ...SELECTABLE_TYPES.android,
+      ...SELECTABLE_TYPES.ios,
+    ];
+
+    expect(all).not.toContain('image/heic');
+    expect(all).not.toContain('image/heif');
+    expect(all).not.toContain('public.heic');
+    // И никакого «любого изображения», под которое HEIC подпадает.
+    expect(all).not.toContain('image/*');
+    expect(all).not.toContain('public.image');
+    expect(all).not.toContain('*/*');
+  });
+});
+
+it('провайдер проигнорировал фильтр типов — unsupported, копия не делается', async () => {
+  // Android: часть провайдеров отдаёт файл вне запрошенных типов.
+  picker.pick.mockResolvedValue([
+    {
+      ...CLOUD_FILE,
+      name: 'IMG_0042.HEIC',
+      type: 'image/heic',
+      nativeType: 'image/heic',
+      hasRequestedType: false,
+    },
+  ]);
+
+  await expect(attachmentErrorCode()).resolves.toBe('unsupported');
+  expect(picker.keepLocalCopy).not.toHaveBeenCalled();
 });
 
 it('сразу делает локальную копию в кэше и отдаёт её, а не исходный URI', async () => {
@@ -129,18 +179,21 @@ it('keepLocalCopy упал — copy-failed', async () => {
 });
 
 describe('виртуальные файлы Android', () => {
+  function virtualFile(convertibleToMimeTypes: unknown[]) {
+    return {
+      ...CLOUD_FILE,
+      name: 'Паспорт',
+      isVirtual: true,
+      convertibleToMimeTypes,
+    };
+  }
+
   it('экспортируются в PDF, если источник это умеет', async () => {
     picker.pick.mockResolvedValue([
-      {
-        ...CLOUD_FILE,
-        name: 'Резюме',
-        type: 'application/vnd.google-apps.document',
-        isVirtual: true,
-        convertibleToMimeTypes: [
-          { mimeType: 'text/plain', extension: 'txt' },
-          { mimeType: 'application/pdf', extension: 'pdf' },
-        ],
-      },
+      virtualFile([
+        { mimeType: 'image/png', extension: 'png' },
+        { mimeType: 'application/pdf', extension: 'pdf' },
+      ]),
     ]);
 
     const result = await pickDocument();
@@ -150,10 +203,32 @@ describe('виртуальные файлы Android', () => {
     expect(result).toMatchObject({ document: { mimeType: 'application/pdf' } });
   });
 
-  it('без вариантов экспорта — unsupported, копия не делается', async () => {
+  it('без PDF берётся другой разрешённый формат', async () => {
     picker.pick.mockResolvedValue([
-      { ...CLOUD_FILE, isVirtual: true, convertibleToMimeTypes: [] },
+      virtualFile([{ mimeType: 'image/png', extension: 'png' }]),
     ]);
+
+    const result = await pickDocument();
+
+    const [options] = picker.keepLocalCopy.mock.calls[0];
+    expect(options.files[0].convertVirtualFileToType).toBe('image/png');
+    expect(result).toMatchObject({ document: { mimeType: 'image/png' } });
+  });
+
+  it('экспорт только в запрещённый формат — unsupported, а не обход фильтра', async () => {
+    picker.pick.mockResolvedValue([
+      virtualFile([
+        { mimeType: 'text/plain', extension: 'txt' },
+        { mimeType: 'image/heic', extension: 'heic' },
+      ]),
+    ]);
+
+    await expect(attachmentErrorCode()).resolves.toBe('unsupported');
+    expect(picker.keepLocalCopy).not.toHaveBeenCalled();
+  });
+
+  it('без вариантов экспорта — unsupported, копия не делается', async () => {
+    picker.pick.mockResolvedValue([virtualFile([])]);
 
     await expect(attachmentErrorCode()).resolves.toBe('unsupported');
     expect(picker.keepLocalCopy).not.toHaveBeenCalled();

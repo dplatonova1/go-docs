@@ -11,17 +11,22 @@ import type { InitialState } from '@react-navigation/native';
 import type { Application } from '../../features/checklist/model';
 
 /**
- * Список заявок, а поверх него — последняя открытая, если она есть
+ * Список заявок, а поверх него — последняя открытая заявка или, если
+ * заявок нет вообще, экран создания
  * ([ADR-0015](../../../docs/adr/0015-multiple-applications-last-opened.md)).
  *
- * Приложение открывается сразу в работе, но «назад» с чек-листа ведёт в
- * список, а не закрывает приложение.
+ * Приложение открывается сразу в работе, но «назад» ведёт в список, а не
+ * закрывает приложение. Пустой список — не тупик: с него всё равно
+ * начинают с создания заявки, поэтому первый запуск ведёт туда сразу.
  */
 export function initialNavigationState(
   application: Application | null,
 ): InitialState {
   if (application === null) {
-    return { index: 0, routes: [{ name: 'ApplicationList' }] };
+    return {
+      index: 1,
+      routes: [{ name: 'ApplicationList' }, { name: 'CreateApplication' }],
+    };
   }
 
   return {

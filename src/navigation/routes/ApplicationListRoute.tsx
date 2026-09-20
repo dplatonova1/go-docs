@@ -4,15 +4,19 @@
  */
 
 import { useIsFocused, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
 
 import { ApplicationListScreen } from '../../features/checklist/ApplicationListScreen';
 import type { Application } from '../../features/checklist/model';
+import type { RootStackParamList } from '../RootNavigator/types';
 
 export function ApplicationListRoute() {
-  const navigation = useNavigation();
-  // Список перечитывается при возврате с чек-листа: заявку могли сбросить
-  // или открыть, и порядок «недавние сверху» изменился.
+  const navigation =
+    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+  // Список перечитывается при возврате: заявку могли открыть,
+  // переименовать или удалить с другого экрана, и порядок «недавние
+  // сверху» изменился.
   const isFocused = useIsFocused();
 
   const handleOpen = useCallback(
@@ -22,15 +26,30 @@ export function ApplicationListRoute() {
     [navigation],
   );
 
+  const handleRename = useCallback(
+    (application: Application) => {
+      navigation.navigate('RenameApplication', {
+        applicationId: application.id,
+      });
+    },
+    [navigation],
+  );
+
   const handleCreate = useCallback(() => {
     navigation.navigate('CreateApplication');
+  }, [navigation]);
+
+  const handleOpenLibrary = useCallback(() => {
+    navigation.navigate('DocumentLibrary');
   }, [navigation]);
 
   return (
     <ApplicationListScreen
       isFocused={isFocused}
       onOpen={handleOpen}
+      onRename={handleRename}
       onCreate={handleCreate}
+      onOpenLibrary={handleOpenLibrary}
     />
   );
 }

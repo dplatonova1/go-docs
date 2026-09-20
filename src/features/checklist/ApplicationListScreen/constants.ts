@@ -1,6 +1,8 @@
-import type { ListState } from './types';
+import type { DeleteState, ListState } from './types';
 
 export const LOADING: ListState = { status: 'loading' };
+
+export const DELETE_IDLE: DeleteState = { status: 'idle' };
 
 export const EMPTY_HINT =
   'Заявок пока нет. Создайте первую: понадобится название и список ' +
@@ -14,5 +16,7 @@ export const TEST_IDS = {
   loadError: 'application-list-error',
   retryButton: 'application-list-retry-button',
   createButton: 'create-application-button',
+  libraryButton: 'open-document-library-button',
+  deleteError: 'application-delete-error',
   empty: 'application-list-empty',
 } as const;

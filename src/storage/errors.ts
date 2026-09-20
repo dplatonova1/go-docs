@@ -51,6 +51,8 @@ export const StorageErrorCode = {
    * телефоне уронил бы приложение по памяти.
    */
   FileTooLarge: 'file-too-large',
+  /** На устройстве не хватает места под файл документа. */
+  NotEnoughSpace: 'not-enough-space',
   /** Сбой операции с БД. */
   DatabaseFailure: 'database-failure',
 } as const;

@@ -117,6 +117,28 @@ export const MIGRATIONS: readonly Migration[] = [
       `UPDATE applications SET last_opened_at = updated_at`,
     ],
   },
+
+  {
+    version: 3,
+    name: 'document_content_hash',
+    statements: [
+      // SHA-256 содержимого файла до шифрования. Один и тот же скан,
+      // прикреплённый второй раз, не должен давать вторую копию на
+      // диске: по этой колонке прикрепление находит уже загруженный
+      // документ и создаёт только связь.
+      //
+      // Шифротекст для этого не годится: у каждого шифрования свой
+      // nonce, и один и тот же файл каждый раз даёт разные байты.
+      `ALTER TABLE documents ADD COLUMN content_hash TEXT`,
+
+      // Уникальность — на уровне схемы, а не только в коде прикрепления.
+      // NULL в SQLite не конфликтует с NULL, поэтому записи, созданные
+      // до этой миграции, остаются как есть: пересчитать их хэш можно
+      // только расшифровав файлы, а это не работа миграции.
+      `CREATE UNIQUE INDEX idx_documents_content_hash
+         ON documents(content_hash)`,
+    ],
+  },
 ];
 
 /**

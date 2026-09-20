@@ -34,28 +34,42 @@
  *   ключу. Сортировка по `attached_at` во временном B-tree — на сотнях
  *   строк неизмерима;
  * - отметка пункта прикреплённым — по первичному ключу;
- * - удаление связи — по составному первичному ключу
- *   `checklist_item_documents`; «есть ли ещё связи у документа» — по
- *   покрывающему `idx_cid_document_id`, «остались ли файлы у пункта» — по
- *   покрывающему первичному ключу. Все четыре запроса точечные.
+ * - библиотека документов — полный проход по `documents` с сортировкой
+ *   во временном B-tree; отметка «уже прикреплён» — по левому столбцу
+ *   первичного ключа `checklist_item_documents`;
+ * - «где используется документ» — по `idx_cid_document_id`, дальше по
+ *   первичным ключам пунктов и заявок, группировка во временном B-tree
+ *   по единицам строк;
+ * - удаление документа — точечные запросы по первичному ключу и
+ *   `idx_cid_document_id`; статусы правятся только у затронутых пунктов;
+ * - открепление — удаление по составному первичному ключу
+ *   `checklist_item_documents`, затем «остались ли файлы у пункта» по
+ *   левому столбцу того же ключа (запрос покрывающий) и отметка пункта по
+ *   первичному ключу. Все три запроса точечные.
  */
 
 import { getDb, withTransaction } from '../../db/client';
 import { newId } from '../../db/ids';
 import { StorageError, StorageErrorCode } from '../../storage/errors';
-import { deleteFile, toRelativePath } from '../../storage/fs';
 import {
   isChecklistItemStatus,
   type Application,
+  type ApplicationDeletionImpact,
   type ApplicationId,
+  type DocumentAttachOutcome,
   type AttachedDocument,
   type ChecklistItem,
   type ChecklistItemId,
   type ChecklistItemStatus,
   type DocumentId,
   type NewApplication,
+  type DocumentUsage,
+  type LibraryAttachResult,
+  type LibraryDocument,
   type NewDocumentAttachment,
-  type ResetImpact,
+  type NonEmptyText,
+  type PackageDocument,
+  type PackageEntry,
 } from './model';
 
 // Недавние сверху. COALESCE защитный: миграция 2 заполнила колонку у
@@ -74,6 +88,9 @@ const SELECT_APPLICATION_BY_ID =
 
 const MARK_APPLICATION_OPENED =
   'UPDATE applications SET last_opened_at = ? WHERE id = ?';
+
+const RENAME_APPLICATION =
+  'UPDATE applications SET title = ?, updated_at = ? WHERE id = ?';
 
 const INSERT_APPLICATION =
   'INSERT INTO applications (id, title, created_at, updated_at, last_opened_at) ' +
@@ -95,10 +112,20 @@ const SELECT_ATTACHED_DOCUMENTS =
   'JOIN documents d ON d.id = cid.document_id ' +
   'WHERE ci.application_id = ? ORDER BY cid.attached_at, d.id';
 
+/**
+ * `OR IGNORE` — страховка от гонки с уникальным индексом по
+ * `content_hash`: документ с таким содержимым мог появиться между
+ * проверкой и вставкой. Вместо исключения строка просто не добавляется,
+ * а кто именно теперь лежит в базе, выясняет следующий запрос.
+ */
 const INSERT_DOCUMENT =
-  'INSERT INTO documents ' +
-  '(id, original_filename, file_path, mime_type, size_bytes, created_at, updated_at) ' +
-  'VALUES (?, ?, ?, ?, ?, ?, ?)';
+  'INSERT OR IGNORE INTO documents ' +
+  '(id, original_filename, file_path, mime_type, size_bytes, content_hash, created_at, updated_at) ' +
+  'VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+
+/** Поиск уже загруженного файла по отпечатку содержимого. */
+const SELECT_DOCUMENT_BY_CONTENT_HASH =
+  'SELECT id, original_filename FROM documents WHERE content_hash = ?';
 
 const INSERT_CHECKLIST_ITEM_DOCUMENT =
   'INSERT INTO checklist_item_documents ' +
@@ -109,51 +136,88 @@ const MARK_CHECKLIST_ITEM_ATTACHED =
   "UPDATE checklist_items SET status = 'attached', updated_at = ? " +
   "WHERE id = ? AND status = 'pending'";
 
-// Предикаты по ADR-0012. Параметр — id заявки. Ссылка на `documents.id`
-// без псевдонима: так один и тот же текст годится и для SELECT, и для
-// DELETE.
-const LINKED_TO_APPLICATION =
-  'EXISTS (SELECT 1 FROM checklist_item_documents cid ' +
-  'JOIN checklist_items ci ON ci.id = cid.checklist_item_id ' +
-  'WHERE cid.document_id = documents.id AND ci.application_id = ?)';
-
-const LINKED_TO_OTHER_APPLICATIONS =
-  'EXISTS (SELECT 1 FROM checklist_item_documents cid ' +
-  'JOIN checklist_items ci ON ci.id = cid.checklist_item_id ' +
-  'WHERE cid.document_id = documents.id AND ci.application_id <> ?)';
-
-/** Параметры: [id заявки, id заявки]. */
-const ONLY_IN_APPLICATION = `${LINKED_TO_APPLICATION} AND NOT ${LINKED_TO_OTHER_APPLICATIONS}`;
-
-/** Параметры: [id заявки, id заявки]. */
-const ALSO_IN_OTHER_APPLICATIONS = `${LINKED_TO_APPLICATION} AND ${LINKED_TO_OTHER_APPLICATIONS}`;
-
 const COUNT_CHECKLIST_ITEMS =
   'SELECT COUNT(*) AS count FROM checklist_items WHERE application_id = ?';
 
-const COUNT_DOCUMENTS_ONLY_IN_APPLICATION = `SELECT COUNT(*) AS count FROM documents WHERE ${ONLY_IN_APPLICATION}`;
-
-const COUNT_DOCUMENTS_ALSO_IN_OTHER_APPLICATIONS = `SELECT COUNT(*) AS count FROM documents WHERE ${ALSO_IN_OTHER_APPLICATIONS}`;
-
-const SELECT_DOCUMENT_PATHS_ONLY_IN_APPLICATION = `SELECT file_path FROM documents WHERE ${ONLY_IN_APPLICATION}`;
-
-const DELETE_DOCUMENTS_ONLY_IN_APPLICATION = `DELETE FROM documents WHERE ${ONLY_IN_APPLICATION}`;
+/**
+ * Сколько документов прикреплено к пунктам заявки. Параметр — id заявки.
+ *
+ * Считаются документы, а не связи: один документ, прикреплённый к трём
+ * пунктам, для пользователя один файл. Ссылка на `documents.id` без
+ * псевдонима — подзапрос вложен в `SELECT ... FROM documents`.
+ */
+const COUNT_DOCUMENTS_OF_APPLICATION =
+  'SELECT COUNT(*) AS count FROM documents WHERE EXISTS (' +
+  'SELECT 1 FROM checklist_item_documents cid ' +
+  'JOIN checklist_items ci ON ci.id = cid.checklist_item_id ' +
+  'WHERE cid.document_id = documents.id AND ci.application_id = ?)';
 
 const DELETE_APPLICATION = 'DELETE FROM applications WHERE id = ?';
 
-const SELECT_DOCUMENT_PATH = 'SELECT file_path FROM documents WHERE id = ?';
+/**
+ * Всё, что нужно сборке пакета, одним запросом: пункты заявки по
+ * порядку и их документы с типом, размером и путём.
+ *
+ * `LEFT JOIN` — чтобы пункты без файлов тоже попали в результат: в
+ * реестре они значатся как «файл не прикреплён».
+ *
+ * План: пункты по `idx_checklist_items_application_id`, связи по левому
+ * столбцу первичного ключа `checklist_item_documents`, документы по
+ * первичному ключу. Сортировка во временном B-tree — пунктов десятки.
+ */
+const SELECT_PACKAGE_ENTRIES =
+  'SELECT ci.id AS item_id, ci.label AS label, ci.position AS position, ' +
+  'd.id AS document_id, d.original_filename AS original_filename, ' +
+  'd.mime_type AS mime_type, d.size_bytes AS size_bytes, ' +
+  'd.file_path AS file_path ' +
+  'FROM checklist_items ci ' +
+  'LEFT JOIN checklist_item_documents cid ON cid.checklist_item_id = ci.id ' +
+  'LEFT JOIN documents d ON d.id = cid.document_id ' +
+  'WHERE ci.application_id = ? ' +
+  'ORDER BY ci.position, cid.attached_at, d.id';
+
+// Библиотека документов. Сортировка — новые сверху: последнее, что
+// загрузили, почти всегда и нужно.
+const SELECT_LIBRARY_DOCUMENTS =
+  'SELECT id, original_filename, mime_type, size_bytes, file_path, created_at ' +
+  'FROM documents ORDER BY created_at DESC, id DESC';
+
+const SELECT_DOCUMENT_IDS_OF_ITEM =
+  'SELECT document_id FROM checklist_item_documents WHERE checklist_item_id = ?';
+
+/**
+ * Где используется документ — по заявке на строку.
+ *
+ * Идёт по `idx_cid_document_id`, дальше по первичным ключам пунктов и
+ * заявок. Группировка по заявке во временном B-tree: строк здесь
+ * столько, в скольких пунктах лежит один документ, то есть единицы.
+ */
+const SELECT_DOCUMENT_USAGE =
+  'SELECT a.title AS title, COUNT(*) AS count ' +
+  'FROM checklist_item_documents cid ' +
+  'JOIN checklist_items ci ON ci.id = cid.checklist_item_id ' +
+  'JOIN applications a ON a.id = ci.application_id ' +
+  'WHERE cid.document_id = ? ' +
+  'GROUP BY a.id, a.title ORDER BY a.title';
+
+const SELECT_ITEM_IDS_OF_DOCUMENT =
+  'SELECT checklist_item_id FROM checklist_item_documents WHERE document_id = ?';
+
+const SELECT_DOCUMENT_FILE_PATH =
+  'SELECT file_path FROM documents WHERE id = ?';
+
+const DELETE_DOCUMENT = 'DELETE FROM documents WHERE id = ?';
+
+const SELECT_LINK =
+  'SELECT 1 FROM checklist_item_documents ' +
+  'WHERE checklist_item_id = ? AND document_id = ? LIMIT 1';
 
 const DELETE_CHECKLIST_ITEM_DOCUMENT =
   'DELETE FROM checklist_item_documents ' +
   'WHERE checklist_item_id = ? AND document_id = ?';
 
-const SELECT_ANY_LINK_OF_DOCUMENT =
-  'SELECT 1 FROM checklist_item_documents WHERE document_id = ? LIMIT 1';
-
 const SELECT_ANY_DOCUMENT_OF_ITEM =
   'SELECT 1 FROM checklist_item_documents WHERE checklist_item_id = ? LIMIT 1';
-
-const DELETE_DOCUMENT = 'DELETE FROM documents WHERE id = ?';
 
 // Обратное к MARK_CHECKLIST_ITEM_ATTACHED: «готово» (Фаза 2) не трогаем.
 const MARK_CHECKLIST_ITEM_PENDING =
@@ -212,6 +276,28 @@ function readCount(result: { readonly rows: readonly Row[] }): number {
     throw malformedRow('COUNT(*)', 'count');
   }
   return readInteger(row, 'COUNT(*)', 'count');
+}
+
+function toLibraryDocument(
+  row: Row,
+  attachedIds: ReadonlySet<string>,
+): LibraryDocument {
+  const id = readText(row, 'documents', 'id');
+  const size = row.size_bytes;
+
+  if (size !== null && (typeof size !== 'number' || !Number.isInteger(size))) {
+    throw malformedRow('documents', 'size_bytes');
+  }
+
+  return {
+    id: id as DocumentId,
+    name: readNullableText(row, 'documents', 'original_filename'),
+    mimeType: readNullableText(row, 'documents', 'mime_type'),
+    sizeBytes: size,
+    createdAt: readText(row, 'documents', 'created_at'),
+    filePath: readText(row, 'documents', 'file_path'),
+    isAttachedToItem: attachedIds.has(id),
+  };
 }
 
 function toApplication(row: Row): Application {
@@ -387,76 +473,134 @@ export function listChecklistItems(
 }
 
 /**
+ * Ищет уже загруженный документ с таким же содержимым.
+ *
+ * Вызывается до шифрования и записи файла: если такой документ есть,
+ * писать на диск нечего — достаточно связи
+ * ([ADR-0018](../../../docs/adr/0018-deduplicate-documents-by-content-hash.md)).
+ *
+ * Поиск по уникальному индексу `idx_documents_content_hash`.
+ */
+export function findDocumentByContentHash(
+  contentHash: string,
+): Promise<AttachedDocument | null> {
+  return guarded('Не удалось проверить, есть ли такой файл', async () => {
+    const db = await getDb();
+    const result = await db.execute(SELECT_DOCUMENT_BY_CONTENT_HASH, [
+      contentHash,
+    ]);
+    const row = result.rows[0];
+
+    return row === undefined
+      ? null
+      : {
+          id: readText(row, 'documents', 'id') as DocumentId,
+          name: readNullableText(row, 'documents', 'original_filename'),
+        };
+  });
+}
+
+/**
  * Записывает прикреплённый документ одной транзакцией: строка в
  * `documents`, связь с пунктом и отметка пункта прикреплённым. Либо всё,
- * либо ничего — документ без связи в Фазе 1 был бы невидимым (ADR-0012).
+ * либо ничего.
  *
- * Зашифрованный файл к этому моменту уже записан; удалить его при ошибке —
- * забота вызывающего (`attachDocument.ts`): транзакция БД файл не
- * откатывает.
+ * Дедупликация по содержимому доделывается здесь, внутри транзакции:
+ * вставка идёт `INSERT OR IGNORE`, и следующий запрос показывает, чья
+ * строка теперь в базе — наша или уже существовавшая. Так гонка с
+ * уникальным индексом по `content_hash` не превращается в исключение и
+ * не оставляет пункт без файла.
+ *
+ * Зашифрованный файл к этому моменту уже записан; удалить его при ошибке
+ * или при `reused` — забота вызывающего (`attachDocument.ts`):
+ * транзакция БД файл не откатывает.
  */
 export function attachDocumentToItem(
   input: NewDocumentAttachment,
-): Promise<void> {
+): Promise<DocumentAttachOutcome> {
   return guarded('Не удалось сохранить прикреплённый файл', async () => {
     const now = new Date().toISOString();
 
-    await withTransaction(async tx => {
+    return withTransaction(async tx => {
       await tx.execute(INSERT_DOCUMENT, [
         input.id,
         input.originalFilename,
         input.filePath,
         input.mimeType,
         input.sizeBytes,
+        input.contentHash,
         now,
         now,
       ]);
+
+      const stored = await tx.execute(SELECT_DOCUMENT_BY_CONTENT_HASH, [
+        input.contentHash,
+      ]);
+      const row = stored.rows[0];
+
+      if (row === undefined) {
+        // Вставку проигнорировали, но документа с таким отпечатком нет:
+        // значит, конфликт был по другому ограничению, и молчать об этом
+        // нельзя — пункт остался бы без файла.
+        throw new StorageError(
+          StorageErrorCode.DatabaseFailure,
+          'Документ не записан и не найден по отпечатку содержимого',
+        );
+      }
+
+      const document: AttachedDocument = {
+        id: readText(row, 'documents', 'id') as DocumentId,
+        name: readNullableText(row, 'documents', 'original_filename'),
+      };
+      const created = document.id === input.id;
+
+      const existingLink = await tx.execute(SELECT_LINK, [
+        input.itemId,
+        document.id,
+      ]);
+      if (existingLink.rows.length > 0) {
+        return { status: 'already-attached', document };
+      }
+
       await tx.execute(INSERT_CHECKLIST_ITEM_DOCUMENT, [
         input.itemId,
-        input.id,
+        document.id,
         now,
       ]);
       await tx.execute(MARK_CHECKLIST_ITEM_ATTACHED, [now, input.itemId]);
+
+      return { status: created ? 'created' : 'reused', document };
     });
   });
 }
 
 /**
- * Снимает связь документа с пунктом и, если это была последняя связь,
- * удаляет сам документ.
+ * Открепляет документ от пункта: снимает связь в
+ * `checklist_item_documents` и больше ничего.
  *
- * Одной транзакцией: путь файла → удаление связи → удаление документа,
- * если связей не осталось → возврат пункта в «не прикреплено», если у
- * него не осталось файлов. Порядок тот же, что при сбросе заявки: после
- * удаления связи отличить «ничей документ» от чужого было бы нельзя.
+ * Запись в `documents` и зашифрованный файл остаются — документ
+ * принадлежит библиотеке пользователя, а не пункту
+ * ([ADR-0010](../../../docs/adr/0010-shared-document-library.md)). Это
+ * изначально спроектированное поведение, возвращённое в Фазе 2 взамен
+ * временного «открепление = удаление» из
+ * [ADR-0013](../../../docs/adr/0013-detach-deletes-document-in-phase-1.md).
  *
- * Документ, оставшийся прикреплённым к другому пункту, не удаляется и его
- * файл не трогается (ADR-0012). В Фазе 1 таких документов не бывает, но
- * код на это не полагается.
+ * Одной транзакцией: удаление связи → возврат пункта в «не прикреплено»,
+ * если у него не осталось файлов. Файлы на диске не трогаются вообще,
+ * поэтому порядок «сначала БД, потом файл» из ADR-0012 здесь больше не
+ * нужен.
  *
- * @returns путь удалённого файла — его стирает вызывающий уже после
- *   commit; `null`, если файл нужно оставить.
+ * Известное следствие, пока нет экрана библиотеки: документ, у которого
+ * не осталось ни одной связи, не показывается нигде и не удаляется даже
+ * при сбросе заявки — см. «Отложенные обязательства» в CLAUDE.md.
  */
 export function detachDocumentFromItem(
   itemId: ChecklistItemId,
   documentId: DocumentId,
-): Promise<string | null> {
-  return guarded('Не удалось удалить прикреплённый файл', () =>
+): Promise<void> {
+  return guarded('Не удалось открепить файл', () =>
     withTransaction(async tx => {
-      const found = await tx.execute(SELECT_DOCUMENT_PATH, [documentId]);
-      const row = found.rows[0];
-      const filePath =
-        row === undefined ? null : readText(row, 'documents', 'file_path');
-
       await tx.execute(DELETE_CHECKLIST_ITEM_DOCUMENT, [itemId, documentId]);
-
-      const otherLinks = await tx.execute(SELECT_ANY_LINK_OF_DOCUMENT, [
-        documentId,
-      ]);
-      const documentDeleted = otherLinks.rows.length === 0;
-      if (documentDeleted) {
-        await tx.execute(DELETE_DOCUMENT, [documentId]);
-      }
 
       const remaining = await tx.execute(SELECT_ANY_DOCUMENT_OF_ITEM, [itemId]);
       if (remaining.rows.length === 0) {
@@ -465,93 +609,277 @@ export function detachDocumentFromItem(
           itemId,
         ]);
       }
-
-      return documentDeleted ? filePath : null;
     }),
   );
 }
 
 /**
- * Что удалит сброс заявки — для диалога подтверждения.
+ * Пункты заявки с документами — для сборки пакета.
  *
- * Числа информационные: к моменту подтверждения набор документов
- * пересчитывается внутри транзакции `deleteApplication`, а не берётся
- * отсюда.
+ * Отличается от `listChecklistItems` тем, что отдаёт путь к файлу, тип и
+ * размер: сборке нужно читать файлы и заранее прикинуть размер
+ * результата.
  */
-export function getResetImpact(
+export function listPackageEntries(
   applicationId: ApplicationId,
-): Promise<ResetImpact> {
-  return guarded('Не удалось подсчитать, что удалит сброс заявки', async () => {
+): Promise<readonly PackageEntry[]> {
+  return guarded('Не удалось прочитать пункты чек-листа', async () => {
     const db = await getDb();
-    const items = await db.execute(COUNT_CHECKLIST_ITEMS, [applicationId]);
-    const deleted = await db.execute(COUNT_DOCUMENTS_ONLY_IN_APPLICATION, [
-      applicationId,
-      applicationId,
-    ]);
-    const kept = await db.execute(COUNT_DOCUMENTS_ALSO_IN_OTHER_APPLICATIONS, [
-      applicationId,
-      applicationId,
-    ]);
+    const result = await db.execute(SELECT_PACKAGE_ENTRIES, [applicationId]);
+
+    const entries: PackageEntry[] = [];
+    const byItem = new Map<string, PackageDocument[]>();
+
+    for (const row of result.rows) {
+      const itemId = readText(row, 'checklist_items', 'id');
+      let documents = byItem.get(itemId);
+
+      if (documents === undefined) {
+        documents = [];
+        byItem.set(itemId, documents);
+        entries.push({
+          itemId: itemId as ChecklistItemId,
+          label: readText(row, 'checklist_items', 'label'),
+          position: readInteger(row, 'checklist_items', 'position'),
+          documents,
+        });
+      }
+
+      // У пункта без файлов колонки документа пустые — это не строка
+      // документа, а сам пункт.
+      if (row.document_id === null || row.document_id === undefined) {
+        continue;
+      }
+
+      const size = row.size_bytes;
+      if (
+        size !== null &&
+        (typeof size !== 'number' || !Number.isInteger(size))
+      ) {
+        throw malformedRow('documents', 'size_bytes');
+      }
+
+      documents.push({
+        id: readText(row, 'documents', 'id') as DocumentId,
+        name: readNullableText(row, 'documents', 'original_filename'),
+        mimeType: readNullableText(row, 'documents', 'mime_type'),
+        sizeBytes: size,
+        filePath: readText(row, 'documents', 'file_path'),
+      });
+    }
+
+    return entries;
+  });
+}
+
+/**
+ * Документы библиотеки — все записи `documents`, новые сверху.
+ *
+ * `itemId` не `null` — библиотека открыта, чтобы выбрать файл для этого
+ * пункта: тогда у каждого документа проставляется `isAttachedToItem`, и
+ * экран не предлагает прикрепить то, что уже прикреплено. Оба запроса в
+ * одной транзакции: прикрепление, закоммиченное между ними, иначе дало
+ * бы документ без отметки.
+ *
+ * Полный проход по `documents` с сортировкой во временном B-tree.
+ * Документов у пользователя сотни — индекс под эту сортировку не нужен,
+ * а стоил бы записи при каждом прикреплении.
+ */
+export function listLibraryDocuments(
+  itemId: ChecklistItemId | null,
+): Promise<readonly LibraryDocument[]> {
+  return guarded('Не удалось прочитать библиотеку документов', () =>
+    withTransaction(async tx => {
+      const attachedIds = new Set<string>();
+
+      if (itemId !== null) {
+        const links = await tx.execute(SELECT_DOCUMENT_IDS_OF_ITEM, [itemId]);
+        for (const row of links.rows) {
+          attachedIds.add(
+            readText(row, 'checklist_item_documents', 'document_id'),
+          );
+        }
+      }
+
+      const documents = await tx.execute(SELECT_LIBRARY_DOCUMENTS);
+      return documents.rows.map(row => toLibraryDocument(row, attachedIds));
+    }),
+  );
+}
+
+/**
+ * В каких заявках и скольких пунктах используется документ.
+ *
+ * Нужно до удаления из библиотеки: удаление снимет документ со всех этих
+ * пунктов, и пользователь должен увидеть, каких именно
+ * ([ADR-0010](../../../docs/adr/0010-shared-document-library.md)).
+ */
+export function getDocumentUsage(
+  documentId: DocumentId,
+): Promise<DocumentUsage> {
+  return guarded('Не удалось посчитать, где используется документ', async () => {
+    const db = await getDb();
+    const result = await db.execute(SELECT_DOCUMENT_USAGE, [documentId]);
+
+    const applications = result.rows.map(row => ({
+      applicationTitle: readText(row, 'applications', 'title'),
+      itemCount: readInteger(row, 'COUNT(*)', 'count'),
+    }));
 
     return {
-      itemCount: readCount(items),
-      deletedDocumentCount: readCount(deleted),
-      keptDocumentCount: readCount(kept),
+      itemCount: applications.reduce((sum, row) => sum + row.itemCount, 0),
+      applications,
     };
   });
 }
 
 /**
- * Удаляет заявку по ADR-0012.
+ * Прикрепляет к пункту документ, который уже есть в библиотеке.
  *
- * Одной транзакцией: пути файлов документов, прикреплённых только к этой
- * заявке → удаление этих документов → удаление заявки (каскад снимает
- * пункты и оставшиеся связи). Документы удаляются до заявки: после
- * каскада у них не останется связей, и отличить «только этой заявки» от
- * «ничьих» будет нельзя.
+ * Файл не читается и не копируется — появляется только связь в
+ * `checklist_item_documents`. Ради этого документы и сделаны общей
+ * библиотекой: один скан закрывает пункты в разных заявках.
  *
- * Файлы стираются только после commit. Наоборот нельзя: сбой после
- * удаления файлов оставил бы строки, указывающие в пустоту.
+ * Повторное прикрепление не ошибка хранилища, а нормальный исход гонки
+ * (два нажатия, открытая в двух местах библиотека), поэтому возвращается
+ * значением, а не исключением.
  */
-export async function deleteApplication(
-  applicationId: ApplicationId,
-): Promise<void> {
-  const filePaths = await guarded('Не удалось сбросить заявку', () =>
+export function attachLibraryDocumentToItem(
+  itemId: ChecklistItemId,
+  documentId: DocumentId,
+): Promise<LibraryAttachResult> {
+  return guarded('Не удалось прикрепить документ из библиотеки', () =>
     withTransaction(async tx => {
-      const documents = await tx.execute(
-        SELECT_DOCUMENT_PATHS_ONLY_IN_APPLICATION,
-        [applicationId, applicationId],
-      );
-      const paths = documents.rows.map(row =>
-        readText(row, 'documents', 'file_path'),
-      );
+      const existing = await tx.execute(SELECT_LINK, [itemId, documentId]);
+      if (existing.rows.length > 0) {
+        return 'already-attached';
+      }
 
-      await tx.execute(DELETE_DOCUMENTS_ONLY_IN_APPLICATION, [
-        applicationId,
-        applicationId,
+      const now = new Date().toISOString();
+      await tx.execute(INSERT_CHECKLIST_ITEM_DOCUMENT, [
+        itemId,
+        documentId,
+        now,
       ]);
-      await tx.execute(DELETE_APPLICATION, [applicationId]);
+      await tx.execute(MARK_CHECKLIST_ITEM_ATTACHED, [now, itemId]);
 
-      return paths;
+      return 'attached';
     }),
   );
-
-  await deleteFilesAfterCommit(filePaths);
 }
 
 /**
- * Ошибка удаления одного файла не прерывает удаление остальных и не
- * превращается в ошибку сброса: заявка в базе уже удалена, и сообщить
- * пользователю «не удалось» было бы неправдой. Оставшийся без строки
- * файл в Фазе 1 так и лежит на диске — уборка при запуске (ADR-0012,
- * раздел 4) осознанно отложена, см. CLAUDE.md.
+ * Удаляет документ из библиотеки: запись и все её связи с пунктами.
+ *
+ * Одной транзакцией: путь файла → пункты, которые держатся на этом
+ * документе → удаление записи (каскад снимает связи) → возврат в «не
+ * прикреплено» тем пунктам, у которых не осталось файлов. Порядок
+ * важен: после каскада узнать, какие пункты затронуты, уже нельзя.
+ *
+ * Файл стирается после commit — этим занимается вызывающий
+ * (`deleteDocumentFromLibrary`). Наоборот нельзя: сбой после удаления
+ * файла оставил бы запись, указывающую в пустоту (ADR-0012, раздел 3).
+ *
+ * @returns путь удалённого файла или `null`, если записи уже не было.
  */
-async function deleteFilesAfterCommit(paths: readonly string[]): Promise<void> {
-  for (const path of paths) {
-    try {
-      await deleteFile(toRelativePath(path));
-    } catch {
-      // Сознательно без реакции, см. комментарий к функции.
-    }
-  }
+export function deleteDocument(
+  documentId: DocumentId,
+): Promise<string | null> {
+  return guarded('Не удалось удалить документ', () =>
+    withTransaction(async tx => {
+      const found = await tx.execute(SELECT_DOCUMENT_FILE_PATH, [documentId]);
+      const row = found.rows[0];
+      if (row === undefined) {
+        return null;
+      }
+      const filePath = readText(row, 'documents', 'file_path');
+
+      const links = await tx.execute(SELECT_ITEM_IDS_OF_DOCUMENT, [documentId]);
+      const itemIds = links.rows.map(link =>
+        readText(link, 'checklist_item_documents', 'checklist_item_id'),
+      );
+
+      await tx.execute(DELETE_DOCUMENT, [documentId]);
+
+      const now = new Date().toISOString();
+      for (const itemId of itemIds) {
+        const remaining = await tx.execute(SELECT_ANY_DOCUMENT_OF_ITEM, [
+          itemId,
+        ]);
+        if (remaining.rows.length === 0) {
+          await tx.execute(MARK_CHECKLIST_ITEM_PENDING, [now, itemId]);
+        }
+      }
+
+      return filePath;
+    }),
+  );
+}
+
+/**
+ * Что произойдёт при удалении заявки — для диалога подтверждения.
+ *
+ * Числа информационные: удаление опирается на каскад, а не на них.
+ */
+export function getApplicationDeletionImpact(
+  applicationId: ApplicationId,
+): Promise<ApplicationDeletionImpact> {
+  return guarded(
+    'Не удалось подсчитать, что удалит удаление заявки',
+    async () => {
+      const db = await getDb();
+      const items = await db.execute(COUNT_CHECKLIST_ITEMS, [applicationId]);
+      const documents = await db.execute(COUNT_DOCUMENTS_OF_APPLICATION, [
+        applicationId,
+      ]);
+
+      return {
+        itemCount: readCount(items),
+        documentCount: readCount(documents),
+      };
+    },
+  );
+}
+
+/**
+ * Удаляет заявку: её саму, её пункты и связи пунктов с документами.
+ *
+ * Документы и их файлы не трогаются
+ * ([ADR-0016](../../../docs/adr/0016-application-deletion-keeps-documents.md)):
+ * документ принадлежит библиотеке пользователя, а не заявке, и
+ * понадобится в следующей.
+ *
+ * Один оператор: пункты и связи снимает `ON DELETE CASCADE` в пределах
+ * того же оператора, поэтому собственная транзакция не нужна. Файловых
+ * операций здесь больше нет вообще, а с ними ушёл и порядок «сначала БД,
+ * потом диск» из ADR-0012.
+ */
+export function deleteApplication(
+  applicationId: ApplicationId,
+): Promise<void> {
+  return guarded('Не удалось удалить заявку', async () => {
+    const db = await getDb();
+    await db.execute(DELETE_APPLICATION, [applicationId]);
+  });
+}
+
+/**
+ * Переименовывает заявку.
+ *
+ * Название приходит `NonEmptyText`, поэтому проверять его здесь не на
+ * что: тип гарантирует непустую строку без пробелов по краям.
+ * Одноимённые заявки не запрещены — см. `createApplication`.
+ */
+export function renameApplication(
+  applicationId: ApplicationId,
+  title: NonEmptyText,
+): Promise<void> {
+  return guarded('Не удалось переименовать заявку', async () => {
+    const db = await getDb();
+    await db.execute(RENAME_APPLICATION, [
+      title,
+      new Date().toISOString(),
+      applicationId,
+    ]);
+  });
 }

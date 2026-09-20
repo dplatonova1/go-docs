@@ -96,7 +96,11 @@ A11y соблюдаем с первого дня, а не «потом прич�
   `padding` на iOS, `height` на Android) + `keyboardShouldPersistTaps="handled"`.
   Полей ручного подтверждения в проекте будет много.
 - **Безопасные зоны — `react-native-safe-area-context`** (уже в
-  зависимостях), не `SafeAreaView` из `react-native`.
+  зависимостях), не `SafeAreaView` из `react-native`. Экран берёт их
+  через [`Screen`](./Screen/Screen.tsx), и верхнюю зону тот по умолчанию
+  **не** учитывает: её уже обошла шапка навигации, а библиотека об этом
+  не знает и отдаёт полный отступ окна. Экраны вне навигатора передают
+  `edges={ALL_EDGES}`.
 - **Платформенные различия — `Platform.select`** или `.ios.tsx`/`.android.tsx`.
   Тени платформенного ветвления не требуют: `boxShadow` на New
   Architecture работает на обеих платформах.

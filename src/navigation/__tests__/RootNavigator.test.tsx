@@ -44,15 +44,34 @@ jest.mock('../../features/checklist/repository', () => ({
   listChecklistItems: jest.fn(),
   createApplication: jest.fn(),
   deleteApplication: jest.fn(),
-  getResetImpact: jest.fn(),
+  getApplicationDeletionImpact: jest.fn(),
+  detachDocumentFromItem: jest.fn(),
+  renameApplication: jest.fn(),
+  listLibraryDocuments: jest.fn(),
+  getDocumentUsage: jest.fn(),
+  attachLibraryDocumentToItem: jest.fn(),
+}));
+
+jest.mock('../../features/library/deleteDocumentFromLibrary', () => ({
+  deleteDocumentFromLibrary: jest.fn(),
+}));
+
+// Превью в библиотеке читает и расшифровывает файл — нативные модули.
+jest.mock('../../storage/fs', () => ({
+  readFile: jest.fn(),
+  toRelativePath: (value: string) => value,
+}));
+
+// Сборка пакета тянет pdf-lib и файловое хранилище (нативные модули).
+// Её путь проверяется своими тестами; здесь нужен только экран.
+jest.mock('../../features/package', () => ({
+  preparePackagePlan: jest.fn(),
+  buildPackage: jest.fn(),
+  sharePackage: jest.fn(),
 }));
 
 jest.mock('../../features/checklist/attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
-}));
-
-jest.mock('../../features/checklist/detachDocument', () => ({
-  deleteAttachedDocument: jest.fn(),
 }));
 
 const client = require('../../db/client');
@@ -72,6 +91,8 @@ beforeEach(() => {
   repository.getApplicationById.mockResolvedValue(APPLICATION);
   repository.markApplicationOpened.mockResolvedValue(undefined);
   repository.listChecklistItems.mockResolvedValue([]);
+  repository.listLibraryDocuments.mockResolvedValue([]);
+  repository.attachLibraryDocumentToItem.mockResolvedValue('attached');
 });
 
 afterEach(cleanup);
@@ -82,15 +103,20 @@ async function renderNavigator() {
   return tree;
 }
 
-it('заявок нет — список с подсказкой; миграции применяются до чтения', async () => {
+it('заявок нет — сразу экран создания; миграции применяются до чтения', async () => {
   const tree = await renderNavigator();
 
-  expect(exists(tree, 'application-list-screen')).toBe(true);
-  expect(exists(tree, 'application-list-empty')).toBe(true);
+  expect(exists(tree, 'create-application-screen')).toBe(true);
   expect(exists(tree, 'checklist-screen')).toBe(false);
   expect(client.runMigrations.mock.invocationCallOrder[0]).toBeLessThan(
     repository.getLastOpenedApplication.mock.invocationCallOrder[0],
   );
+});
+
+it('под экраном создания остаётся список — уйти с первого запуска есть куда', async () => {
+  const tree = await renderNavigator();
+
+  expect(exists(tree, 'application-list-screen')).toBe(true);
 });
 
 it('есть последняя открытая — сразу её чек-лист', async () => {
@@ -142,21 +168,19 @@ it('заявка из восстановленного маршрута удал
 
   const tree = await renderNavigator();
 
-  expect(exists(tree, 'checklist-route-missing')).toBe(true);
+  expect(exists(tree, 'application-route-missing')).toBe(true);
   expect(exists(tree, 'checklist-screen')).toBe(false);
 
   await press(tree, 'back-to-applications-button');
   await flush();
 
-  expect(exists(tree, 'checklist-route-missing')).toBe(false);
+  expect(exists(tree, 'application-route-missing')).toBe(false);
   expect(exists(tree, 'application-list-screen')).toBe(true);
 });
 
-it('из списка можно создать заявку и попасть в её чек-лист', async () => {
+it('после создания заявки открывается её чек-лист', async () => {
   const tree = await renderNavigator();
 
-  await press(tree, 'create-application-button');
-  await flush();
   expect(exists(tree, 'create-application-screen')).toBe(true);
 
   await ReactTestRenderer.act(async () => {
@@ -183,6 +207,64 @@ it('после сброса заявки — возврат к списку', as
   expect(exists(tree, 'application-list-screen')).toBe(true);
 });
 
+it('из списка открывается переименование заявки', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.listApplications.mockResolvedValue([APPLICATION]);
+  const tree = await renderNavigator();
+
+  // С чек-листа — назад к списку, оттуда — в переименование.
+  await ReactTestRenderer.act(async () => {
+    tree.root.findByType(ChecklistScreen).props.onReset();
+  });
+  await flush();
+
+  await press(tree, 'application-row-0-rename');
+  await flush();
+
+  expect(exists(tree, 'rename-application-screen')).toBe(true);
+  expect(repository.getApplicationById).toHaveBeenCalledWith('app-1');
+});
+
+it('из списка открывается библиотека документов', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.listApplications.mockResolvedValue([APPLICATION]);
+  const tree = await renderNavigator();
+
+  // Список под чек-листом данные не грузит, пока не получит фокус, —
+  // поэтому сначала возвращаемся на него.
+  await ReactTestRenderer.act(async () => {
+    tree.root.findByType(ChecklistScreen).props.onReset();
+  });
+  await flush();
+
+  await press(tree, 'open-document-library-button');
+  await flush();
+
+  expect(exists(tree, 'document-library-screen')).toBe(true);
+  expect(repository.listLibraryDocuments).toHaveBeenCalledWith(null);
+});
+
+it('из пункта чек-листа открывается выбор файла из библиотеки', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  repository.listChecklistItems.mockResolvedValue([
+    {
+      id: 'i1',
+      label: 'Паспорт',
+      position: 0,
+      status: 'pending',
+      documents: [],
+    },
+  ]);
+  const tree = await renderNavigator();
+
+  await press(tree, 'checklist-item-0-pick-from-library');
+  await flush();
+
+  expect(exists(tree, 'document-library-screen')).toBe(true);
+  // Библиотека открыта для конкретного пункта — иначе прикреплять некуда.
+  expect(repository.listLibraryDocuments).toHaveBeenCalledWith('i1');
+});
+
 it('хранилище недоступно — понятная ошибка и повтор', async () => {
   const failure = new StorageError(
     StorageErrorCode.KeychainUnavailable,
@@ -200,4 +282,13 @@ it('хранилище недоступно — понятная ошибка и
   await flush();
 
   expect(exists(tree, 'application-list-screen')).toBe(true);
+});
+
+it('заявки есть — запуск открывает последнюю, а не экран создания', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+
+  const tree = await renderNavigator();
+
+  expect(exists(tree, 'checklist-screen')).toBe(true);
+  expect(exists(tree, 'create-application-screen')).toBe(false);
 });

@@ -1,6 +1,6 @@
 /**
  * Пункт сохранённого чек-листа: текст, статус «прикреплено / не
- * прикреплено», прикреплённые файлы с кнопкой удаления и кнопка
+ * прикреплено», прикреплённые файлы с кнопкой открепления и кнопка
  * прикрепления.
  *
  * Элементы озвучиваются по отдельности, а не одной группой: внутри
@@ -18,6 +18,7 @@ import {
   FileName,
   FileRow,
   Label,
+  NoticeText,
   StatusBadge,
   StatusText,
 } from './styles';
@@ -28,11 +29,13 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   index,
   total,
   isAttaching,
-  deletingDocumentId,
+  detachingDocumentId,
   actionsDisabled,
   actionError,
+  actionNotice,
   onAttach,
-  onDeleteFile,
+  onPickFromLibrary,
+  onDetachFile,
 }: ChecklistItemRowProps) {
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
@@ -44,9 +47,14 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
     [item.id, onAttach],
   );
 
-  const handleDelete = useCallback(
-    (document: AttachedDocument) => onDeleteFile(item.id, document),
-    [item.id, onDeleteFile],
+  const handlePickFromLibrary = useCallback(
+    () => onPickFromLibrary(item.id),
+    [item.id, onPickFromLibrary],
+  );
+
+  const handleDetach = useCallback(
+    (document: AttachedDocument) => onDetachFile(item.id, document),
+    [item.id, onDetachFile],
   );
 
   let attachLabel = attached ? 'Прикрепить ещё файл' : 'Прикрепить файл';
@@ -74,7 +82,7 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
 
       {item.documents.map((document, documentIndex) => {
         const name = document.name ?? UNNAMED_FILE;
-        const isDeleting = deletingDocumentId === document.id;
+        const isDetaching = detachingDocumentId === document.id;
 
         return (
           <FileRow key={document.id}>
@@ -90,13 +98,13 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
 
             <Button
               variant="danger"
-              label={isDeleting ? 'Удаление…' : 'Удалить'}
-              // Вслух — что именно удаляется: «Удалить» без имени файла в
-              // списке из нескольких файлов ничего не говорит.
-              accessibilityLabel={`Удалить файл ${name} из пункта ${number}: ${item.label}`}
-              testID={`${testID}-file-${documentIndex}-delete`}
+              label={isDetaching ? 'Открепление…' : 'Открепить'}
+              // Вслух — что именно открепляется: «Открепить» без имени
+              // файла в списке из нескольких ничего не говорит.
+              accessibilityLabel={`Открепить файл ${name} от пункта ${number}: ${item.label}`}
+              testID={`${testID}-file-${documentIndex}-detach`}
               disabled={actionsDisabled}
-              onPress={() => handleDelete(document)}
+              onPress={() => handleDetach(document)}
             />
           </FileRow>
         );
@@ -112,13 +120,31 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
         </ErrorText>
       ) : null}
 
+      {actionNotice !== null ? (
+        <NoticeText
+          accessibilityLiveRegion="polite"
+          testID={`${testID}-notice`}
+        >
+          {actionNotice}
+        </NoticeText>
+      ) : null}
+
       <Button
         variant="secondary"
         label={attachLabel}
-        accessibilityLabel={`Прикрепить файл к пункту ${number}: ${item.label}`}
+        accessibilityLabel={`Загрузить файл с устройства и прикрепить к пункту ${number}: ${item.label}`}
         testID={`${testID}-attach`}
         disabled={actionsDisabled}
         onPress={handleAttach}
+      />
+
+      <Button
+        variant="secondary"
+        label="Выбрать из библиотеки"
+        accessibilityLabel={`Прикрепить к пункту ${number}: ${item.label} файл, уже загруженный в приложение`}
+        testID={`${testID}-pick-from-library`}
+        disabled={actionsDisabled}
+        onPress={handlePickFromLibrary}
       />
     </Container>
   );

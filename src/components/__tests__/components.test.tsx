@@ -16,7 +16,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppThemeProvider } from '../../theme/ThemeProvider';
 import { Button } from '../Button';
-import { Screen } from '../Screen';
+import { ALL_EDGES, Screen } from '../Screen';
 import { TextField } from '../TextField';
 
 // Мок библиотеки отдаёт компоненты под `default`, а не именованными
@@ -47,6 +47,24 @@ function propsOf(
   const nodes = tree.root.findAllByProps({ testID });
   expect(nodes.length).toBeGreaterThan(0);
   return nodes[0]?.props ?? {};
+}
+
+/**
+ * Значение пропса там, где он уже подставлен.
+ *
+ * `testID` есть и у самого компонента, и у узлов внутри него, а пропсы со
+ * значением по умолчанию появляются только внутри — поэтому берётся
+ * первый узел, где пропс определён, а не самый внешний.
+ */
+function resolvedProp(
+  tree: ReactTestRenderer.ReactTestRenderer,
+  testID: string,
+  prop: string,
+): unknown {
+  return tree.root.find(
+    candidate =>
+      candidate.props.testID === testID && candidate.props[prop] !== undefined,
+  ).props[prop];
 }
 
 describe('Button', () => {
@@ -99,6 +117,18 @@ describe('TextField', () => {
     );
   });
 
+  it('нативная подчёркивающая линия Android отключена', () => {
+    // Иначе поверх рамки поля Android рисует свою нижнюю линию — на iOS
+    // этого не видно, и регрессия прошла бы незамеченной.
+    const tree = render(
+      <TextField label="Номер" accessibilityLabel="Номер" testID="passport" />,
+    );
+
+    expect(resolvedProp(tree, 'passport', 'underlineColorAndroid')).toBe(
+      'transparent',
+    );
+  });
+
   it('ошибку объявляет вслух', () => {
     const tree = render(
       <TextField
@@ -126,5 +156,23 @@ describe('Screen', () => {
     expect(tree.root.findAllByProps({ testID: 'inner' }).length).toBeGreaterThan(
       0,
     );
+  });
+
+  it('по умолчанию не учитывает верхнюю безопасную зону', () => {
+    // Её уже учла шапка навигации; второй отступ — пустая полоса под
+    // шапкой (ADR-0014).
+    const tree = render(<Screen testID="screen">{null}</Screen>);
+
+    expect(resolvedProp(tree, 'screen', 'edges')).toEqual(['bottom', 'left', 'right']);
+  });
+
+  it('экран вне навигации может запросить все зоны', () => {
+    const tree = render(
+      <Screen testID="screen" edges={ALL_EDGES}>
+        {null}
+      </Screen>,
+    );
+
+    expect(resolvedProp(tree, 'screen', 'edges')).toContain('top');
   });
 });

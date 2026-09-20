@@ -64,6 +64,16 @@ export const FileName = styled.Text`
   color: ${({ theme }) => theme.colors.text};
 `;
 
+/**
+ * Сообщение об успешном исходе, о котором стоит сказать. Цвет —
+ * второстепенного текста: красный здесь означал бы ошибку, которой нет.
+ */
+export const NoticeText = styled.Text`
+  ${textSize(14)}
+  font-family: ${FONTS.regular};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
 export const ErrorText = styled.Text`
   ${textSize(14)}
   font-family: ${FONTS.medium};

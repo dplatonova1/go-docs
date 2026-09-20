@@ -11,7 +11,7 @@
  * поле ввода, здесь не частный случай, а норма.
  */
 
-import { KEYBOARD_BEHAVIOR } from './constants';
+import { DEFAULT_EDGES, KEYBOARD_BEHAVIOR } from './constants';
 import {
   KeyboardAvoider,
   Root,
@@ -20,7 +20,12 @@ import {
 } from './styles';
 import type { ScreenProps } from './types';
 
-export function Screen({ children, scrollable = true, testID }: ScreenProps) {
+export function Screen({
+  children,
+  scrollable = true,
+  edges = DEFAULT_EDGES,
+  testID,
+}: ScreenProps) {
   const content = scrollable ? (
     <ScrollContainer
       // Иначе первое касание только прячет клавиатуру, и кнопку под ней
@@ -34,7 +39,7 @@ export function Screen({ children, scrollable = true, testID }: ScreenProps) {
   );
 
   return (
-    <Root testID={testID}>
+    <Root edges={edges} testID={testID}>
       <KeyboardAvoider behavior={KEYBOARD_BEHAVIOR}>{content}</KeyboardAvoider>
     </Root>
   );
