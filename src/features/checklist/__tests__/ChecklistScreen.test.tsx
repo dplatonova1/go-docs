@@ -36,6 +36,10 @@ jest.mock('../../package', () => ({
   preparePackagePlan: jest.fn(),
   buildPackage: jest.fn(),
   sharePackage: jest.fn(),
+  // Сводка о качестве — чистая функция без нативных зависимостей:
+  // мокать её незачем, и тест проверяет настоящий текст.
+  qualityWarning: jest.requireActual('../../package/qualitySummary')
+    .qualityWarning,
 }));
 
 jest.mock('../attachDocument', () => ({
@@ -380,6 +384,42 @@ describe('сборка пакета', () => {
       finish(RESULT);
     });
     await flush();
+  });
+
+  it('размытый снимок назван сразу после сборки, до отправки', async () => {
+    packageFeature.buildPackage.mockResolvedValue({
+      ...RESULT,
+      registry: [
+        {
+          itemNumber: 1,
+          itemLabel: 'Паспорт',
+          fileName: 'Паспорт.jpg',
+          status: 'included',
+          pageCount: 1,
+          quality: 'blurry',
+        },
+      ],
+    });
+    const tree = await renderScreen();
+
+    await press(tree, 'build-package-button');
+
+    const warning = String(
+      findByTestId(tree, 'package-quality-warning').props.children,
+    );
+    expect(warning).toContain('пункт 1 «Паспорт» — возможно, размыт');
+    // Сборку это не отменяет: пакет собран и отправлен.
+    expect(packageFeature.sharePackage).toHaveBeenCalledWith(
+      expect.objectContaining({ fileName: 'Пакет.pdf' }),
+    );
+  });
+
+  it('без замечаний сводка не показывается', async () => {
+    const tree = await renderScreen();
+
+    await press(tree, 'build-package-button');
+
+    expect(exists(tree, 'package-quality-warning')).toBe(false);
   });
 
   it('собранный пакет можно отправить ещё раз, не собирая заново', async () => {

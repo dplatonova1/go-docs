@@ -16,7 +16,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0007](./0007-privacy-policy-gate-for-cloud-sync.md) | Privacy policy — обязательное условие перед запуском облачной синхронизации | Accepted (вступает в силу в Фазе 6) |
 | [0008](./0008-known-risk-keychain-decryption-failures.md) | Известный риск react-native-keychain (сбои расшифровки на Android) + обязательные митигации к Фазе 1 | Accepted |
 | [0009](./0009-minimal-android-permissions.md) | Минимальный набор разрешений в release-манифесте, контроль при каждой новой зависимости | Accepted |
-| [0010](./0010-shared-document-library.md) | Документы — общая библиотека пользователя, many-to-many с пунктами чек-листа | Accepted |
+| [0010](./0010-shared-document-library.md) | Документы — общая библиотека пользователя, many-to-many с пунктами чек-листа | Accepted; предупреждение о каскаде реализовано 2026-09-23 |
 | [0011](./0011-styled-components.md) | Стили компонентов — styled-components, тема через `ThemeProvider` | Accepted |
 | [0012](./0012-delete-orphan-documents-with-application.md) | Удаление заявки удаляет документы, которые больше ни к чему не прикреплены (с подтверждением) | Частично заменён ADR-0016 |
 | [0013](./0013-detach-deletes-document-in-phase-1.md) | Открепление файла в Фазе 1 — полное удаление документа, а не снятие связи | Accepted; поведение снято 2026-09-20, см. «Обновление» в ADR |
@@ -26,6 +26,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0017](./0017-document-library-screen.md) | Экран библиотеки документов: переиспользование файлов и удаление с устройства | Accepted |
 | [0018](./0018-deduplicate-documents-by-content-hash.md) | Дедупликация документов по SHA-256 содержимого | Accepted |
 | [0019](./0019-pdf-package-assembly.md) | Сборка финального PDF-пакета: реестр, сжатие снимков, share sheet | Accepted |
+| [0020](./0020-package-file-types-limited-to-images-and-pdf.md) | В пакет попадают только JPEG, PNG и PDF; конвертация docx отвергнута | Accepted |
 
 ## Когда заводить новый ADR
 

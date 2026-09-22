@@ -33,6 +33,7 @@ import { Screen } from '../../../components/Screen';
 import {
   buildPackage,
   preparePackagePlan,
+  qualityWarning,
   sharePackage,
   type PackageBuildResult,
 } from '../../package';
@@ -370,6 +371,11 @@ export function ChecklistScreen({
     }
   }, [application, share]);
 
+  const packageWarning =
+    packageState.status === 'done'
+      ? qualityWarning(packageState.result.registry)
+      : null;
+
   const total = state.status === 'loaded' ? state.items.length : 0;
   const attachedCount =
     state.status === 'loaded' ? state.items.filter(isAttached).length : 0;
@@ -449,6 +455,17 @@ export function ChecklistScreen({
               testID={TEST_IDS.packageResult}
             >
               {`Пакет собран: страниц — ${packageState.result.pageCount}`}
+            </NoticeText>
+          ) : null}
+
+          {/* Пометки детектора есть и в реестре внутри PDF, но туда надо
+              заглянуть, а переснять дешевле до отправки. */}
+          {packageState.status === 'done' && packageWarning !== null ? (
+            <NoticeText
+              accessibilityLiveRegion="polite"
+              testID={TEST_IDS.packageQualityWarning}
+            >
+              {packageWarning}
             </NoticeText>
           ) : null}
 

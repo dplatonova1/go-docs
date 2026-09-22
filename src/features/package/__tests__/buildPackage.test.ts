@@ -12,6 +12,7 @@
 
 import type { ApplicationId, ChecklistItemId, DocumentId } from '../../checklist/model';
 import { buildPackage } from '../buildPackage';
+import { isPackageAssemblyError } from '../errors';
 import { planPackage } from '../plan';
 
 jest.mock('../../../storage/fs', () => ({
@@ -33,7 +34,7 @@ jest.mock('../registryFonts', () => ({
   loadRegistryFonts: jest.fn(),
 }));
 
-jest.mock('@pdf-lib/fontkit', () => ({}));
+jest.mock('@cantoo/fontkit', () => ({}));
 
 jest.mock('@cantoo/pdf-lib', () => {
   const create = jest.fn();
@@ -269,6 +270,46 @@ it('целевой файл появляется только после усп�
   expect(exportFile.writeTemporaryExport).toHaveBeenCalledWith(SAVED);
   expect(result.filePath).toBe('/cache/packages/Пакет — ВНЖ Сербия.pdf');
   expect(result.fileName).toBe('Пакет — ВНЖ Сербия.pdf');
+});
+
+it('сбой шрифта — понятная ошибка сборки, а не «непредвиденная»', async () => {
+  // Ровно этот случай дал «непредвиденную ошибку» на устройстве:
+  // несовместимый fontkit падал внутри embedFont.
+  PDFDocument.create.mockImplementation(async () => ({
+    ...fakePdf(),
+    registerFontkit: () => {
+      throw new Error("Cannot read properties of undefined (reading 'pos')");
+    },
+  }));
+  const plan = planPackage([
+    entry('i1', 'Паспорт', [document('d1', 'application/pdf')]),
+  ]);
+
+  const error = await buildPackage(APPLICATION, plan, () => {}).catch(
+    (e: unknown) => e,
+  );
+
+  expect(isPackageAssemblyError(error)).toBe(true);
+  expect(exportFile.finalizeExport).not.toHaveBeenCalled();
+});
+
+it('сбой записи PDF — тоже ошибка сборки, а не молчание', async () => {
+  PDFDocument.create.mockImplementation(async () => ({
+    ...fakePdf(),
+    save: async () => {
+      throw new Error('out of memory');
+    },
+  }));
+  const plan = planPackage([
+    entry('i1', 'Паспорт', [document('d1', 'application/pdf')]),
+  ]);
+
+  const error = await buildPackage(APPLICATION, plan, () => {}).catch(
+    (e: unknown) => e,
+  );
+
+  expect(isPackageAssemblyError(error)).toBe(true);
+  expect(exportFile.writeTemporaryExport).not.toHaveBeenCalled();
 });
 
 it('не хватило места — сборка не начинается', async () => {

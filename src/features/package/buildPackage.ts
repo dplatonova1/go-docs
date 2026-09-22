@@ -29,7 +29,11 @@
  * страницы полезнее, чем отсутствие пакета.
  */
 
-import fontkit from '@pdf-lib/fontkit';
+// Именно `@cantoo/fontkit`, а не `@pdf-lib/fontkit`: последний — тот же
+// fontkit многолетней давности, и на Onest он падает ещё при разборе
+// таблиц шрифта («Cannot read properties of undefined (reading 'pos')»).
+// Форк pdf-lib, который мы используем, рассчитан на свой же форк fontkit.
+import fontkit from '@cantoo/fontkit';
 import { PDFDocument } from '@cantoo/pdf-lib';
 
 import { assertEnoughSpace, readFile, toRelativePath } from '../../storage/fs';
@@ -40,6 +44,7 @@ import {
   writeTemporaryExport,
 } from '../../storage/exportFile';
 import type { Application } from '../checklist/model';
+import { PackageAssemblyError } from './errors';
 import { documentsToProcess } from './plan';
 import { processImage } from './processImage';
 import { loadRegistryFonts } from './registryFonts';
@@ -157,19 +162,43 @@ export async function buildPackage(
   plan: PackagePlan,
   onProgress: (progress: PackageProgress) => void,
 ): Promise<PackageBuildResult> {
+  // TextDecoder, которого нет в Hermes, ставится не здесь, а при запуске
+  // приложения (`src/polyfills/install.ts`): fontkit требует его уже при
+  // загрузке своего модуля, то есть раньше любого нашего кода.
+
   // Незашифрованные пакеты прошлых сборок не должны лежать в кэше,
   // пока собирается новый.
   await clearExportDirectory();
   await assertEnoughSpace(plan.estimatedBytes);
 
   const fontBytes = await loadRegistryFonts();
-  const pdf = await PDFDocument.create();
-  pdf.registerFontkit(fontkit);
 
-  const fonts = {
-    regular: await pdf.embedFont(fontBytes.regular, { subset: true }),
-    semibold: await pdf.embedFont(fontBytes.semibold, { subset: true }),
-  };
+  // Создание документа, fontkit и шрифт — всё, что сборка просит у чужих
+  // библиотек ещё до первого документа. Сбой здесь — не «непредвиденная
+  // ошибка», а вполне определённая: несовпадение версий fontkit,
+  // отсутствующий полифилл или испорченный файл шрифта.
+  let pdf: PDFDocument;
+  let fonts;
+  try {
+    pdf = await PDFDocument.create();
+    pdf.registerFontkit(fontkit);
+
+    // `subset: false` намеренно. Обрезка шрифта в fontkit идёт через
+    // `structuredClone`, которого в Hermes тоже нет, и тянуть ради неё
+    // второй полифилл незачем: целиком встроенный Onest добавляет к
+    // пакету около 180 КБ на оба начертания — на фоне фотографий это
+    // ничто. Если размер когда-нибудь станет важен, лечится полифиллом
+    // `structuredClone`, а не возвратом `subset: true` как есть.
+    fonts = {
+      regular: await pdf.embedFont(fontBytes.regular, { subset: false }),
+      semibold: await pdf.embedFont(fontBytes.semibold, { subset: false }),
+    };
+  } catch (error) {
+    throw new PackageAssemblyError(
+      'Не удалось встроить шрифт титульной страницы',
+      error,
+    );
+  }
 
   const planned = documentsToProcess(plan);
   const rows: RegistryRow[] = [];
@@ -195,19 +224,28 @@ export async function buildPackage(
     }
   }
 
-  const registryPageCount = drawRegistry(
-    pdf,
-    fonts,
-    {
-      applicationTitle: application.title,
-      attachedItemCount: plan.attachedItemCount,
-      itemCount: plan.itemCount,
-      createdAt: formatDate(new Date()),
-    },
-    rows,
-  );
+  let bytes: Uint8Array;
+  let registryPageCount: number;
+  try {
+    registryPageCount = drawRegistry(
+      pdf,
+      fonts,
+      {
+        applicationTitle: application.title,
+        attachedItemCount: plan.attachedItemCount,
+        itemCount: plan.itemCount,
+        createdAt: formatDate(new Date()),
+      },
+      rows,
+    );
 
-  const bytes = await pdf.save();
+    bytes = await pdf.save();
+  } catch (error) {
+    throw new PackageAssemblyError(
+      'Не удалось собрать титульную страницу или записать PDF',
+      error,
+    );
+  }
   const temporaryPath = await writeTemporaryExport(bytes);
   const fileName = toExportFileName(application.title);
   const filePath = await finalizeExport(temporaryPath, fileName);

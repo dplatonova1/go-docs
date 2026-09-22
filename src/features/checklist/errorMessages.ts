@@ -8,6 +8,7 @@
  */
 
 import { StorageErrorCode, isStorageError } from '../../storage/errors';
+import { isPackageAssemblyError } from '../package/errors';
 import { AttachmentError, type AttachmentErrorCode } from './errors';
 import { MAX_ATTACHMENT_MEGABYTES } from './model';
 
@@ -46,9 +47,15 @@ const ATTACHMENT_ERROR_MESSAGES = {
     'Прикрепить можно JPEG, PNG или PDF. Сохраните файл в одном из этих форматов и попробуйте снова.',
 } as const satisfies Record<AttachmentErrorCode, string>;
 
+const PACKAGE_ASSEMBLY_MESSAGE =
+  'Не удалось собрать пакет из документов. Попробуйте ещё раз.';
+
 const UNKNOWN_ERROR_MESSAGE = 'Непредвиденная ошибка. Попробуйте ещё раз.';
 
 export function describeError(error: unknown): string {
+  if (isPackageAssemblyError(error)) {
+    return PACKAGE_ASSEMBLY_MESSAGE;
+  }
   if (error instanceof AttachmentError) {
     return ATTACHMENT_ERROR_MESSAGES[error.code];
   }

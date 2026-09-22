@@ -269,6 +269,14 @@ describe('выбор файла для пункта', () => {
     expect(onAttached).toHaveBeenCalledTimes(1);
   });
 
+  it('у всего интерактивного есть accessibilityLabel и testID', async () => {
+    // Режим выбора проверяется отдельно от просмотра: кнопки в строках
+    // разные, и подпись «Прикрепить» без имени файла ничего не говорит.
+    const { tree } = await renderScreen(ITEM_ID);
+
+    expect(interactiveWithoutA11y(tree)).toEqual([]);
+  });
+
   it('удаления из библиотеки в этом режиме нет', async () => {
     const { tree } = await renderScreen(ITEM_ID);
 

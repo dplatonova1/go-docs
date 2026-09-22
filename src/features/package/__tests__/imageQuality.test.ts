@@ -77,6 +77,78 @@ it('порядок каналов читается, а не угадываетс
   );
 });
 
+describe('фикстуры, похожие на настоящие снимки', () => {
+  const FIXTURE_SIDE = 128;
+
+  /** «Документ»: светлый фон и тёмные полосы текста с резкими краями. */
+  function documentPixels(x: number, y: number): number {
+    const isTextLine = y % 12 < 4;
+    const isGlyph = x % 7 < 5;
+    return isTextLine && isGlyph ? 35 : 240;
+  }
+
+  /**
+   * Размывает картинку скользящим средним — то же, что делает расфокус
+   * или дрожание рук: резкие границы превращаются в плавные переходы.
+   */
+  function blurred(
+    source: (x: number, y: number) => number,
+    radius: number,
+  ): (x: number, y: number) => number {
+    return (x, y) => {
+      let sum = 0;
+      let count = 0;
+      for (let dy = -radius; dy <= radius; dy += 1) {
+        for (let dx = -radius; dx <= radius; dx += 1) {
+          const nx = Math.min(FIXTURE_SIDE - 1, Math.max(0, x + dx));
+          const ny = Math.min(FIXTURE_SIDE - 1, Math.max(0, y + dy));
+          sum += source(nx, ny);
+          count += 1;
+        }
+      }
+      return sum / count;
+    };
+  }
+
+  it('резкий скан документа претензий не вызывает', () => {
+    expect(assessQuality(sample(documentPixels, 'RGBA', FIXTURE_SIDE))).toBeNull();
+  });
+
+  it('заведомо смазанный скан помечается размытым', () => {
+    // Радиус 5 — расфокус, который виден невооружённым глазом:
+    // дисперсия лапласиана падает с ~22000 до ~80 при пороге 90.
+    const smudged = blurred(documentPixels, 5);
+
+    expect(assessQuality(sample(smudged, 'RGBA', FIXTURE_SIDE))).toBe('blurry');
+  });
+
+  it('снятый в темноте помечается тёмным, а не размытым', () => {
+    // Те же границы, но яркость придавлена — как съёмка без света.
+    const dark = (x: number, y: number) => documentPixels(x, y) * 0.15;
+
+    expect(assessQuality(sample(dark, 'RGBA', FIXTURE_SIDE))).toBe('dark');
+  });
+
+  it('лёгкая нерезкость ещё не повод для тревоги', () => {
+    // Детектор должен ошибаться в сторону «всё хорошо»: пометка на
+    // каждом втором документе приучит её игнорировать.
+    const slightly = blurred(documentPixels, 1);
+
+    expect(assessQuality(sample(slightly, 'RGBA', FIXTURE_SIDE))).toBeNull();
+  });
+
+  it('средняя нерезкость пока проходит — известная граница порога', () => {
+    // Тест фиксирует поведение, а не одобряет его: при радиусе 3
+    // дисперсия ~143 против порога 90, и такой снимок молча проходит.
+    // Порог подбирался без реальных фотографий — его калибровка висит в
+    // «Отложенных обязательствах» (CLAUDE.md). Когда порог поменяется,
+    // этот тест упадёт и заставит решение пересмотреть осознанно.
+    const moderate = blurred(documentPixels, 3);
+
+    expect(assessQuality(sample(moderate, 'RGBA', FIXTURE_SIDE))).toBeNull();
+  });
+});
+
 it('незнакомый формат пикселей — молчание, а не догадка', () => {
   expect(assessQuality(sample(() => 20, 'unknown'))).toBe(null);
 });

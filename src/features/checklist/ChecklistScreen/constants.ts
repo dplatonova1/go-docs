@@ -46,4 +46,5 @@ export const TEST_IDS = {
   packageProgress: 'package-progress',
   packageError: 'package-error',
   packageResult: 'package-result',
+  packageQualityWarning: 'package-quality-warning',
 } as const;

@@ -631,7 +631,9 @@ export function listPackageEntries(
     const byItem = new Map<string, PackageDocument[]>();
 
     for (const row of result.rows) {
-      const itemId = readText(row, 'checklist_items', 'id');
+      // Имена колонок — псевдонимы из запроса: `id` есть и у пункта, и у
+      // документа, и без псевдонимов одна колонка затирала бы другую.
+      const itemId = readText(row, 'checklist_items', 'item_id');
       let documents = byItem.get(itemId);
 
       if (documents === undefined) {
@@ -660,7 +662,7 @@ export function listPackageEntries(
       }
 
       documents.push({
-        id: readText(row, 'documents', 'id') as DocumentId,
+        id: readText(row, 'documents', 'document_id') as DocumentId,
         name: readNullableText(row, 'documents', 'original_filename'),
         mimeType: readNullableText(row, 'documents', 'mime_type'),
         sizeBytes: size,

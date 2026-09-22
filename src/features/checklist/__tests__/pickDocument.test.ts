@@ -99,6 +99,46 @@ describe('список разрешённых типов', () => {
   });
 });
 
+describe('типы вне JPEG, PNG и PDF', () => {
+  const REJECTED = [
+    ['HEIC с камеры iPhone', 'image/heic'],
+    ['документ Word', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    ['простой текст', 'text/plain'],
+    ['архив', 'application/zip'],
+    ['тип неизвестен провайдеру', null],
+  ] as const;
+
+  it.each(REJECTED)('%s не проходит: unsupported, копия не делается', async (_name, mimeType) => {
+    // Провайдер может проигнорировать фильтр (на Android это штатная
+    // ситуация) — тогда библиотека помечает выбор `hasRequestedType:
+    // false`, и дальше файл не идёт.
+    picker.pick.mockResolvedValue([
+      {
+        ...CLOUD_FILE,
+        type: mimeType,
+        nativeType: mimeType,
+        hasRequestedType: false,
+      },
+    ]);
+
+    await expect(attachmentErrorCode()).resolves.toBe('unsupported');
+    expect(picker.keepLocalCopy).not.toHaveBeenCalled();
+  });
+
+  it.each(['image/jpeg', 'image/png', 'application/pdf'] as const)(
+    '%s проходит',
+    async mimeType => {
+      picker.pick.mockResolvedValue([
+        { ...CLOUD_FILE, type: mimeType, nativeType: mimeType },
+      ]);
+
+      const result = await pickDocument();
+
+      expect(result).toMatchObject({ status: 'picked', document: { mimeType } });
+    },
+  );
+});
+
 it('провайдер проигнорировал фильтр типов — unsupported, копия не делается', async () => {
   // Android: часть провайдеров отдаёт файл вне запрошенных типов.
   picker.pick.mockResolvedValue([
