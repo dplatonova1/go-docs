@@ -25,6 +25,7 @@ import { useTheme } from 'styled-components/native';
 
 import { Screen } from '../../../components/Screen';
 import { Button } from '../../../components/Button';
+import { translations, useTranslation } from '../../../i18n';
 import { libraryDocumentDeletionConfirmation } from '../../checklist/confirmations';
 import { describeError } from '../../checklist/errorMessages';
 import {
@@ -38,13 +39,7 @@ import {
 } from '../../checklist/repository';
 import { DocumentRow } from '../DocumentRow';
 import { deleteDocumentFromLibrary } from '../deleteDocumentFromLibrary';
-import {
-  ACTION_IDLE,
-  ALREADY_ATTACHED_MESSAGE,
-  EMPTY_HINT,
-  LOADING,
-  TEST_IDS,
-} from './constants';
+import { ACTION_IDLE, LOADING, TEST_IDS } from './constants';
 import {
   ErrorText,
   Header,
@@ -63,6 +58,7 @@ export function DocumentLibraryScreen({
   isFocused = true,
   onAttached,
 }: DocumentLibraryScreenProps) {
+  const t = useTranslation();
   const theme = useTheme();
   const mode = itemId === null ? 'browse' : 'pick';
   const [state, setState] = useState<ListState>(LOADING);
@@ -116,12 +112,14 @@ export function DocumentLibraryScreen({
         if (result === 'already-attached') {
           setActionState({
             status: 'failed',
-            message: ALREADY_ATTACHED_MESSAGE,
+            message: translations().library.alreadyAttached,
           });
           return;
         }
 
-        AccessibilityInfo.announceForAccessibility('Файл прикреплён');
+        AccessibilityInfo.announceForAccessibility(
+          translations().library.announceAttached,
+        );
         setActionState(ACTION_IDLE);
         onAttached();
       } catch (error) {
@@ -153,7 +151,9 @@ export function DocumentLibraryScreen({
             }
           : current,
       );
-      AccessibilityInfo.announceForAccessibility('Файл удалён из библиотеки');
+      AccessibilityInfo.announceForAccessibility(
+        translations().library.announceDeleted,
+      );
       setActionState(ACTION_IDLE);
     } catch (error) {
       setActionState({ status: 'failed', message: describeError(error) });
@@ -184,9 +184,9 @@ export function DocumentLibraryScreen({
 
         Alert.alert(title, message, [
           // Первой и с ролью cancel: случайное касание не должно удалять.
-          { text: 'Отмена', style: 'cancel' },
+          { text: t.common.cancel, style: 'cancel' },
           {
-            text: 'Удалить',
+            text: t.common.delete,
             style: 'destructive',
             onPress: () => {
               confirmDelete(document);
@@ -197,7 +197,7 @@ export function DocumentLibraryScreen({
         setActionState({ status: 'failed', message: describeError(error) });
       }
     },
-    [confirmDelete],
+    [confirmDelete, t],
   );
 
   const total = state.status === 'loaded' ? state.documents.length : 0;
@@ -226,8 +226,8 @@ export function DocumentLibraryScreen({
     <Header>
       <Summary>
         {mode === 'pick'
-          ? 'Выберите файл, уже загруженный в приложение, — он прикрепится к пункту без повторной загрузки.'
-          : `Файлов в библиотеке: ${total}`}
+          ? t.library.pickHint
+          : t.library.browseSummary(total)}
       </Summary>
 
       {actionState.status === 'failed' ? (
@@ -252,7 +252,9 @@ export function DocumentLibraryScreen({
           renderItem={renderItem}
           ListHeaderComponent={header}
           ListEmptyComponent={
-            <Hint testID={TEST_IDS.empty}>{EMPTY_HINT[mode]}</Hint>
+            <Hint testID={TEST_IDS.empty}>
+              {mode === 'pick' ? t.library.emptyPick : t.library.emptyBrowse}
+            </Hint>
           }
           contentContainerStyle={listContentStyle}
           // Превью расшифровывается на лету, поэтому за раз готовится
@@ -271,7 +273,7 @@ export function DocumentLibraryScreen({
         <ActivityIndicator
           size="large"
           color={theme.colors.primary}
-          accessibilityLabel="Загрузка библиотеки документов"
+          accessibilityLabel={t.library.loadingA11y}
           testID={TEST_IDS.loading}
         />
       ) : (
@@ -284,8 +286,8 @@ export function DocumentLibraryScreen({
             {state.message}
           </ErrorText>
           <Button
-            label="Повторить"
-            accessibilityLabel="Повторить загрузку библиотеки документов"
+            label={t.common.retry}
+            accessibilityLabel={t.library.retryA11y}
             testID={TEST_IDS.retryButton}
             onPress={retry}
           />

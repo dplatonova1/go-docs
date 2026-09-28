@@ -7,25 +7,23 @@
  * чем переподавать документы.
  *
  * Модуль чистый: на вход строки реестра, на выход готовый текст.
+ * Формулировки — в словарях ([`src/i18n`](../../i18n)).
  *
  * Числа — в скобках, без склонений («снимки (1)»): так текст остаётся
  * верным при любом количестве, как и в остальных сообщениях проекта.
  */
 
-import type { QualityFlag, RegistryRow } from './types';
+import { translations } from '../../i18n';
+import type { RegistryRow } from './types';
 
 /** Сколько пунктов перечислять поимённо, прежде чем свернуть в «и ещё». */
 const MAX_LISTED = 3;
-
-const QUALITY_TEXT = {
-  blurry: 'возможно, размыт',
-  dark: 'возможно, тёмный',
-} as const satisfies Record<QualityFlag, string>;
 
 /**
  * @returns текст предупреждения или `null`, если претензий нет.
  */
 export function qualityWarning(rows: readonly RegistryRow[]): string | null {
+  const t = translations().package;
   const flagged = rows.filter(row => row.quality !== null);
 
   if (flagged.length === 0) {
@@ -36,16 +34,13 @@ export function qualityWarning(rows: readonly RegistryRow[]): string | null {
     .slice(0, MAX_LISTED)
     .map(row => {
       const quality = row.quality;
-      const note = quality === null ? '' : QUALITY_TEXT[quality];
-      return `пункт ${row.itemNumber} «${row.itemLabel}» — ${note}`;
+      const note = quality === null ? '' : t.summaryQuality[quality];
+      return t.summaryEntry(row.itemNumber, row.itemLabel, note);
     })
     .join('; ');
 
   const rest = flagged.length - MAX_LISTED;
-  const tail = rest > 0 ? ` и ещё (${rest})` : '';
+  const tail = rest > 0 ? t.summaryMore(rest) : '';
 
-  return (
-    `Снимки с замечаниями (${flagged.length}): ${listed}${tail}. ` +
-    'Проверьте их перед печатью — возможно, стоит переснять и собрать пакет заново.'
-  );
+  return t.summary(flagged.length, listed, tail);
 }

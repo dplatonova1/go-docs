@@ -2,10 +2,13 @@
  * Форматирование даты добавления.
  *
  * Проверяется без `Intl`: месяцы должны быть русскими на любой сборке
- * Hermes, а не только на той, где ICU полный.
+ * Hermes, а не только на той, где ICU полный. Язык тестов — русский, его
+ * задаёт `test-utils/setupLocale.ts`; отдельно проверяется, что месяцы
+ * следуют за выбранным языком.
  */
 
-import { UNKNOWN_DATE, formatAddedDate } from '../formatAddedDate';
+import { setLocale, translations } from '../../../i18n';
+import { formatAddedDate } from '../formatAddedDate';
 
 it('месяц в родительном падеже, день без ведущего нуля', () => {
   // Время задано так, чтобы дата не менялась при сдвиге часового пояса
@@ -40,6 +43,13 @@ it('все двенадцать месяцев подписаны', () => {
 it('мусор в базе не ломает строку списка', () => {
   // Строка приходит из БД: испорченная запись не должна давать
   // «Invalid Date» в интерфейсе.
-  expect(formatAddedDate('не дата')).toBe(UNKNOWN_DATE);
-  expect(formatAddedDate('')).toBe(UNKNOWN_DATE);
+  expect(formatAddedDate('не дата')).toBe(translations().date.unknown);
+  expect(formatAddedDate('')).toBe(translations().date.unknown);
+});
+
+it('месяцы следуют за выбранным языком', () => {
+  setLocale('en');
+
+  expect(formatAddedDate('2026-03-12T12:00:00.000Z')).toBe('12 March 2026');
+  expect(formatAddedDate('не дата')).toBe('date unknown');
 });

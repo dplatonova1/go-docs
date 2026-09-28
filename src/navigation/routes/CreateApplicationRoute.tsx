@@ -16,8 +16,8 @@ import { Alert } from 'react-native';
 
 import { CreateApplicationScreen } from '../../features/checklist/CreateApplicationScreen';
 import type { Application } from '../../features/checklist/model';
+import { translations } from '../../i18n';
 import type { RootStackParamList } from '../RootNavigator/types';
-import { LEAVE_CREATE_CONFIRMATION } from './constants';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'CreateApplication'>;
 
@@ -26,10 +26,14 @@ export function CreateApplicationRoute({ navigation }: Props) {
   const [created, setCreated] = useState<Application | null>(null);
 
   usePreventRemove(isDirty, ({ data }) => {
-    Alert.alert(LEAVE_CREATE_CONFIRMATION.title, LEAVE_CREATE_CONFIRMATION.message, [
-      { text: 'Остаться', style: 'cancel' },
+    // Словарь берётся в момент показа диалога: колбэк живёт дольше
+    // рендера, и снятая заранее ссылка застыла бы на старом языке.
+    const t = translations().leaveCreate;
+
+    Alert.alert(t.title, t.message, [
+      { text: t.stay, style: 'cancel' },
       {
-        text: 'Выйти',
+        text: t.leave,
         style: 'destructive',
         onPress: () => navigation.dispatch(data.action),
       },

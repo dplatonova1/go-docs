@@ -10,8 +10,9 @@
  * чек-листа пропадёт и сколько документов останется в библиотеке
  * ([ADR-0016](../../../../docs/adr/0016-application-deletion-keeps-documents.md)).
  *
- * Отсюда же открывается библиотека документов: она общая для всех
- * заявок, и заходить в неё через конкретную заявку было бы странно.
+ * Отсюда же открываются библиотека документов и настройки: и то и
+ * другое общее для всех заявок, и заходить туда через конкретную заявку
+ * было бы странно.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,6 +26,7 @@ import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
+import { useTranslation } from '../../../i18n';
 import { ApplicationRow } from '../ApplicationRow';
 import { applicationDeletionConfirmation } from '../confirmations';
 import { describeError } from '../errorMessages';
@@ -34,7 +36,7 @@ import {
   getApplicationDeletionImpact,
   listApplications,
 } from '../repository';
-import { DELETE_IDLE, EMPTY_HINT, LOADING, TEST_IDS } from './constants';
+import { DELETE_IDLE, LOADING, TEST_IDS } from './constants';
 import { ErrorText, Footer, Hint, listContentStyle } from './styles';
 import type {
   ApplicationListScreenProps,
@@ -48,7 +50,9 @@ export function ApplicationListScreen({
   onRename,
   onCreate,
   onOpenLibrary,
+  onOpenSettings,
 }: ApplicationListScreenProps) {
+  const t = useTranslation();
   const theme = useTheme();
   const [state, setState] = useState<ListState>(LOADING);
   const [attempt, setAttempt] = useState(0);
@@ -137,9 +141,9 @@ export function ApplicationListScreen({
 
         Alert.alert(title, message, [
           // Первой и с ролью cancel: случайное касание не должно удалять.
-          { text: 'Отмена', style: 'cancel' },
+          { text: t.common.cancel, style: 'cancel' },
           {
-            text: 'Удалить',
+            text: t.common.delete,
             style: 'destructive',
             onPress: () => {
               confirmDelete(application);
@@ -150,7 +154,7 @@ export function ApplicationListScreen({
         setDeleteState({ status: 'failed', message: describeError(error) });
       }
     },
-    [confirmDelete],
+    [confirmDelete, t],
   );
 
   const total = state.status === 'loaded' ? state.applications.length : 0;
@@ -188,8 +192,8 @@ export function ApplicationListScreen({
       ) : null}
 
       <Button
-        label="Создать заявку"
-        accessibilityLabel="Создать новую заявку"
+        label={t.applicationList.create}
+        accessibilityLabel={t.applicationList.createA11y}
         testID={TEST_IDS.createButton}
         disabled={isDeleting}
         onPress={onCreate}
@@ -197,11 +201,20 @@ export function ApplicationListScreen({
 
       <Button
         variant="secondary"
-        label="Библиотека документов"
-        accessibilityLabel="Открыть библиотеку загруженных документов"
+        label={t.applicationList.library}
+        accessibilityLabel={t.applicationList.libraryA11y}
         testID={TEST_IDS.libraryButton}
         disabled={isDeleting}
         onPress={onOpenLibrary}
+      />
+
+      <Button
+        variant="secondary"
+        label={t.applicationList.settings}
+        accessibilityLabel={t.applicationList.settingsA11y}
+        testID={TEST_IDS.settingsButton}
+        disabled={isDeleting}
+        onPress={onOpenSettings}
       />
     </Footer>
   );
@@ -214,7 +227,9 @@ export function ApplicationListScreen({
           data={state.applications}
           keyExtractor={applicationKeyOf}
           renderItem={renderItem}
-          ListEmptyComponent={<Hint testID={TEST_IDS.empty}>{EMPTY_HINT}</Hint>}
+          ListEmptyComponent={
+            <Hint testID={TEST_IDS.empty}>{t.applicationList.emptyHint}</Hint>
+          }
           ListFooterComponent={footer}
           contentContainerStyle={listContentStyle}
         />
@@ -228,7 +243,7 @@ export function ApplicationListScreen({
         <ActivityIndicator
           size="large"
           color={theme.colors.primary}
-          accessibilityLabel="Загрузка списка заявок"
+          accessibilityLabel={t.applicationList.loadingA11y}
           testID={TEST_IDS.loading}
         />
       ) : (
@@ -241,8 +256,8 @@ export function ApplicationListScreen({
             {state.message}
           </ErrorText>
           <Button
-            label="Повторить"
-            accessibilityLabel="Повторить загрузку списка заявок"
+            label={t.common.retry}
+            accessibilityLabel={t.applicationList.retryA11y}
             testID={TEST_IDS.retryButton}
             onPress={retry}
           />

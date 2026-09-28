@@ -17,10 +17,11 @@ import { AccessibilityInfo } from 'react-native';
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import { TextField } from '../../../components/TextField';
+import { translations, useTranslation } from '../../../i18n';
 import { describeError } from '../errorMessages';
 import { toNonEmptyText } from '../model';
 import { renameApplication } from '../repository';
-import { IDLE, SAVING, TEST_IDS, TITLE_REQUIRED_ERROR } from './constants';
+import { IDLE, SAVING, TEST_IDS } from './constants';
 import { Actions, FormError, Hint } from './styles';
 import type { RenameApplicationScreenProps, SaveState } from './types';
 
@@ -29,6 +30,7 @@ export function RenameApplicationScreen({
   onRenamed,
   onCancel,
 }: RenameApplicationScreenProps) {
+  const t = useTranslation();
   const [title, setTitle] = useState(application.title);
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>(IDLE);
@@ -58,7 +60,9 @@ export function RenameApplicationScreen({
 
     try {
       await renameApplication(application.id, trimmed);
-      AccessibilityInfo.announceForAccessibility('Название заявки изменено');
+      AccessibilityInfo.announceForAccessibility(
+        translations().renameApplication.announceRenamed,
+      );
       onRenamed();
     } catch (error) {
       savingRef.current = false;
@@ -68,21 +72,20 @@ export function RenameApplicationScreen({
 
   return (
     <Screen testID={TEST_IDS.screen}>
-      <Hint>
-        Название видно только вам — в списке заявок. На документы и пункты
-        чек-листа оно не влияет.
-      </Hint>
+      <Hint>{t.renameApplication.hint}</Hint>
 
       <TextField
-        label="Название заявки"
-        accessibilityLabel="Название заявки"
+        label={t.renameApplication.titleLabel}
+        accessibilityLabel={t.renameApplication.titleLabel}
         testID={TEST_IDS.titleInput}
         value={title}
         onChangeText={setTitle}
         autoFocus
         returnKeyType="done"
         onSubmitEditing={handleSave}
-        error={showTitleError ? TITLE_REQUIRED_ERROR : undefined}
+        error={
+          showTitleError ? t.renameApplication.titleRequired : undefined
+        }
       />
 
       {saveState.status === 'failed' ? (
@@ -97,8 +100,8 @@ export function RenameApplicationScreen({
 
       <Actions>
         <Button
-          label={isSaving ? 'Сохранение…' : 'Сохранить'}
-          accessibilityLabel="Сохранить новое название заявки"
+          label={isSaving ? t.common.saving : t.common.save}
+          accessibilityLabel={t.renameApplication.saveA11y}
           testID={TEST_IDS.saveButton}
           disabled={isSaving}
           onPress={handleSave}
@@ -106,8 +109,8 @@ export function RenameApplicationScreen({
 
         <Button
           variant="secondary"
-          label="Отмена"
-          accessibilityLabel="Отменить переименование заявки"
+          label={t.common.cancel}
+          accessibilityLabel={t.renameApplication.cancelA11y}
           testID={TEST_IDS.cancelButton}
           disabled={isSaving}
           onPress={onCancel}

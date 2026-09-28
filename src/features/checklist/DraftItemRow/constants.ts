@@ -8,5 +8,3 @@ export const TEST_ID_PREFIX = 'draft-item';
 
 /** Высота поля пункта: требования в списках часто длиннее одной строки. */
 export const ITEM_MIN_LINES = 2;
-
-export const EMPTY_ITEM_ERROR = 'Пустой пункт: заполните или удалите его';

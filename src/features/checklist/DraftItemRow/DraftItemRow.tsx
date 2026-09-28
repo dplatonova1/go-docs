@@ -7,15 +7,18 @@
  *
  * Мемоизирована: при вводе в одно поле остальные строки не
  * перерисовываются — колбэки приходят стабильными, а `item` у
- * неизменённых пунктов сохраняет ссылку (см. `draftReducer`).
+ * неизменённых пунктов сохраняет ссылку (см. `draftReducer`). Поэтому
+ * тексты берутся хуком: с прежними пропсами строка не узнала бы о смене
+ * языка (см. [`src/i18n`](../../../i18n)).
  */
 
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
 import { TextField } from '../../../components/TextField';
+import { useTranslation } from '../../../i18n';
 import { formatChecklistLabel } from '../parseChecklistText';
-import { EMPTY_ITEM_ERROR, ITEM_MIN_LINES, TEST_ID_PREFIX } from './constants';
+import { ITEM_MIN_LINES, TEST_ID_PREFIX } from './constants';
 import { Actions, Container } from './styles';
 import type { DraftItemRowProps } from './types';
 
@@ -29,6 +32,7 @@ export const DraftItemRow = memo(function DraftItemRowImpl({
   onMove,
   onRemove,
 }: DraftItemRowProps) {
+  const t = useTranslation();
   const { key } = item;
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
@@ -52,8 +56,8 @@ export const DraftItemRow = memo(function DraftItemRowImpl({
   return (
     <Container testID={testID}>
       <TextField
-        label={`Пункт ${number}`}
-        accessibilityLabel={`Текст пункта ${number} из ${total}`}
+        label={t.draftItem.label(number)}
+        accessibilityLabel={t.draftItem.inputA11y(number, total)}
         testID={`${testID}-input`}
         value={item.label}
         onChangeText={handleChange}
@@ -65,30 +69,30 @@ export const DraftItemRow = memo(function DraftItemRowImpl({
         submitBehavior="blurAndSubmit"
         minLines={ITEM_MIN_LINES}
         autoFocus={autoFocus}
-        error={hasError ? EMPTY_ITEM_ERROR : undefined}
+        error={hasError ? t.draftItem.emptyItem : undefined}
       />
 
       <Actions>
         <Button
           variant="secondary"
-          label="Выше"
-          accessibilityLabel={`Переместить пункт ${number} выше`}
+          label={t.draftItem.moveUp}
+          accessibilityLabel={t.draftItem.moveUpA11y(number)}
           testID={`${testID}-move-up`}
           disabled={index === 0}
           onPress={handleMoveUp}
         />
         <Button
           variant="secondary"
-          label="Ниже"
-          accessibilityLabel={`Переместить пункт ${number} ниже`}
+          label={t.draftItem.moveDown}
+          accessibilityLabel={t.draftItem.moveDownA11y(number)}
           testID={`${testID}-move-down`}
           disabled={index === total - 1}
           onPress={handleMoveDown}
         />
         <Button
           variant="danger"
-          label="Удалить"
-          accessibilityLabel={`Удалить пункт ${number}`}
+          label={t.common.delete}
+          accessibilityLabel={t.draftItem.removeA11y(number)}
           testID={`${testID}-remove`}
           onPress={handleRemove}
         />

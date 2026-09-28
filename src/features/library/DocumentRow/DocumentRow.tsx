@@ -6,14 +6,18 @@
  * скринридера скрыта (`accessibilityElementsHidden`): она ничего не
  * добавляет к имени файла рядом, а как отдельный элемент только удлиняет
  * обход списка.
+ *
+ * Тексты берутся хуком: строка мемоизирована и с прежними пропсами не
+ * перерисовалась бы при смене языка (см. [`src/i18n`](../../../i18n)).
  */
 
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { useTranslation } from '../../../i18n';
 import { formatAddedDate } from '../formatAddedDate';
 import { useDocumentPreview } from '../useDocumentPreview';
-import { PREVIEW_PLACEHOLDER, TEST_ID_PREFIX, UNNAMED_DOCUMENT } from './constants';
+import { TEST_ID_PREFIX } from './constants';
 import {
   Actions,
   Card,
@@ -38,10 +42,13 @@ export const DocumentRow = memo(function DocumentRowImpl({
   onAttach,
   onDelete,
 }: DocumentRowProps) {
+  const t = useTranslation();
   const preview = useDocumentPreview(document);
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
-  const name = document.name ?? UNNAMED_DOCUMENT;
+  const name = document.name ?? t.documentRow.unnamedDocument;
+  // Дата пересчитывается вместе с языком: названия месяцев у каждого
+  // свои, и хук здесь — то, что доносит до строки смену языка.
   const added = formatAddedDate(document.createdAt);
 
   const handleAttach = useCallback(
@@ -72,14 +79,19 @@ export const DocumentRow = memo(function DocumentRowImpl({
             testID={`${testID}-preview-placeholder`}
           >
             <PreviewPlaceholderText>
-              {PREVIEW_PLACEHOLDER[preview.status]}
+              {t.documentRow.previewPlaceholder[preview.status]}
             </PreviewPlaceholderText>
           </PreviewPlaceholder>
         )}
 
         <Info>
           <Name
-            accessibilityLabel={`Документ ${number} из ${total}: ${name}, добавлен ${added}`}
+            accessibilityLabel={t.documentRow.nameA11y(
+              number,
+              total,
+              name,
+              added,
+            )}
             testID={`${testID}-name`}
             numberOfLines={2}
             // Середина, а не конец: расширение в конце имени важнее.
@@ -87,7 +99,7 @@ export const DocumentRow = memo(function DocumentRowImpl({
           >
             {name}
           </Name>
-          <Meta testID={`${testID}-added`}>{`Добавлен ${added}`}</Meta>
+          <Meta testID={`${testID}-added`}>{t.documentRow.added(added)}</Meta>
         </Info>
       </Header>
 
@@ -96,15 +108,15 @@ export const DocumentRow = memo(function DocumentRowImpl({
           <Button
             label={
               document.isAttachedToItem
-                ? 'Уже прикреплён'
+                ? t.documentRow.attached
                 : isBusy
-                ? 'Прикрепление…'
-                : 'Прикрепить к пункту'
+                ? t.documentRow.attaching
+                : t.documentRow.attach
             }
             accessibilityLabel={
               document.isAttachedToItem
-                ? `Файл ${name} уже прикреплён к этому пункту`
-                : `Прикрепить файл ${name} к пункту чек-листа`
+                ? t.documentRow.attachedA11y(name)
+                : t.documentRow.attachA11y(name)
             }
             testID={`${testID}-attach`}
             disabled={actionsDisabled || document.isAttachedToItem}
@@ -114,10 +126,12 @@ export const DocumentRow = memo(function DocumentRowImpl({
         ) : (
           <Button
             variant="danger"
-            label={isBusy ? 'Удаление…' : 'Удалить из библиотеки'}
+            label={
+              isBusy ? t.common.deleting : t.documentRow.deleteFromLibrary
+            }
             // Вслух — что именно удаляется и откуда: рядом в чек-листе
             // есть похожее по звучанию «Открепить», а последствия разные.
-            accessibilityLabel={`Удалить файл ${name} из библиотеки, со всех чек-листов`}
+            accessibilityLabel={t.documentRow.deleteA11y(name)}
             testID={`${testID}-delete`}
             disabled={actionsDisabled}
             style={actionStyle}

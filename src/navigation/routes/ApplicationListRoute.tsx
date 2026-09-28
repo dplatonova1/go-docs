@@ -43,6 +43,10 @@ export function ApplicationListRoute() {
     navigation.navigate('DocumentLibrary');
   }, [navigation]);
 
+  const handleOpenSettings = useCallback(() => {
+    navigation.navigate('Settings');
+  }, [navigation]);
+
   return (
     <ApplicationListScreen
       isFocused={isFocused}
@@ -50,6 +54,7 @@ export function ApplicationListRoute() {
       onRename={handleRename}
       onCreate={handleCreate}
       onOpenLibrary={handleOpenLibrary}
+      onOpenSettings={handleOpenSettings}
     />
   );
 }

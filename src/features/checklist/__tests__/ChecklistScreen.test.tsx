@@ -2,6 +2,7 @@ import React from 'react';
 import { Alert, type AlertButton } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
+import { setLocale } from '../../../i18n';
 import { StorageError, StorageErrorCode } from '../../../storage/errors';
 import {
   cleanup,
@@ -746,4 +747,31 @@ describe('открепление файла от пункта', () => {
       finish(undefined);
     });
   });
+});
+
+it('смена языка доходит до мемоизированных строк списка', async () => {
+  // Строка чек-листа под `memo`, и пропсы у неё не меняются: язык
+  // приходит к ней своей подпиской, а не от родителя (ADR-0021).
+  repository.listChecklistItems.mockResolvedValue([
+    {
+      id: 'i1',
+      label: 'Паспорт',
+      position: 0,
+      status: 'pending',
+      documents: [],
+    },
+  ]);
+
+  const tree = await renderScreen();
+
+  expect(texts(tree)).toContain('Не прикреплено');
+
+  await ReactTestRenderer.act(async () => {
+    setLocale('en');
+  });
+
+  expect(texts(tree)).toContain('Not attached');
+  expect(texts(tree)).not.toContain('Не прикреплено');
+  // И сам экран тоже: заголовок списка над строками.
+  expect(texts(tree)).toContain('Items in the checklist: 1');
 });

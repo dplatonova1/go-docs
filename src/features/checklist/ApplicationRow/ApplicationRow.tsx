@@ -5,11 +5,15 @@
  * Название — отдельная кнопка во всю ширину, а не вся карточка целиком:
  * иначе кнопки внутри оказались бы вложены в нажимаемую область, и
  * скринридер объявлял бы строку одной кнопкой.
+ *
+ * Тексты берутся хуком: строка мемоизирована и с прежними пропсами не
+ * перерисовалась бы при смене языка (см. [`src/i18n`](../../../i18n)).
  */
 
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { useTranslation } from '../../../i18n';
 import { TEST_ID_PREFIX } from './constants';
 import { Actions, Card, OpenArea, Title, actionStyle, pressedStyle } from './styles';
 import type { ApplicationRowProps } from './types';
@@ -24,6 +28,7 @@ export const ApplicationRow = memo(function ApplicationRowImpl({
   onRename,
   onDelete,
 }: ApplicationRowProps) {
+  const t = useTranslation();
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
 
@@ -46,7 +51,11 @@ export const ApplicationRow = memo(function ApplicationRowImpl({
     <Card testID={testID}>
       <OpenArea
         accessibilityRole="button"
-        accessibilityLabel={`Заявка ${number} из ${total}: ${application.title}. Открыть чек-лист`}
+        accessibilityLabel={t.applicationRow.openA11y(
+          number,
+          total,
+          application.title,
+        )}
         accessibilityState={{ disabled: actionsDisabled }}
         testID={`${testID}-open`}
         disabled={actionsDisabled}
@@ -59,10 +68,10 @@ export const ApplicationRow = memo(function ApplicationRowImpl({
       <Actions>
         <Button
           variant="secondary"
-          label="Переименовать"
+          label={t.applicationRow.rename}
           // Вслух — какую именно: «Переименовать» в списке из нескольких
           // заявок ничего не говорит.
-          accessibilityLabel={`Переименовать заявку ${application.title}`}
+          accessibilityLabel={t.applicationRow.renameA11y(application.title)}
           testID={`${testID}-rename`}
           disabled={actionsDisabled}
           style={actionStyle}
@@ -71,8 +80,8 @@ export const ApplicationRow = memo(function ApplicationRowImpl({
 
         <Button
           variant="danger"
-          label={isDeleting ? 'Удаление…' : 'Удалить'}
-          accessibilityLabel={`Удалить заявку ${application.title}`}
+          label={isDeleting ? t.common.deleting : t.common.delete}
+          accessibilityLabel={t.applicationRow.deleteA11y(application.title)}
           testID={`${testID}-delete`}
           disabled={actionsDisabled}
           style={actionStyle}

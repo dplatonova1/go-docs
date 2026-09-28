@@ -20,6 +20,7 @@ import { useTheme } from 'styled-components/native';
 import { Button } from '../../components/Button';
 import { Screen } from '../../components/Screen';
 import { describeError } from '../../features/checklist/errorMessages';
+import { useTranslation } from '../../i18n';
 import type {
   Application,
   ApplicationId,
@@ -27,7 +28,7 @@ import type {
 import { getApplicationById } from '../../features/checklist/repository';
 import { Centered, Message } from '../RootNavigator/styles';
 import type { RootStackParamList } from '../RootNavigator/types';
-import { MISSING_APPLICATION_MESSAGE, TEST_IDS } from './constants';
+import { TEST_IDS } from './constants';
 
 type ApplicationState =
   | { readonly status: 'loading' }
@@ -49,6 +50,7 @@ export function ApplicationGate({
   onReady,
   children,
 }: ApplicationGateProps) {
+  const t = useTranslation();
   const theme = useTheme();
   // Типизированный хук: `popTo` есть у стека, а не у навигации вообще.
   const navigation =
@@ -105,7 +107,7 @@ export function ApplicationGate({
             <ActivityIndicator
               size="large"
               color={theme.colors.primary}
-              accessibilityLabel="Загрузка заявки"
+              accessibilityLabel={t.applicationGate.loadingA11y}
             />
           </Centered>
         </Screen>
@@ -118,8 +120,8 @@ export function ApplicationGate({
             {state.message}
           </Message>
           <Button
-            label="Повторить"
-            accessibilityLabel="Повторить загрузку заявки"
+            label={t.common.retry}
+            accessibilityLabel={t.applicationGate.retryA11y}
             testID={TEST_IDS.applicationRetryButton}
             onPress={retry}
           />
@@ -130,11 +132,11 @@ export function ApplicationGate({
       return (
         <Screen testID={TEST_IDS.applicationMissing}>
           <Message accessibilityRole="alert" accessibilityLiveRegion="polite">
-            {MISSING_APPLICATION_MESSAGE}
+            {t.applicationGate.missing}
           </Message>
           <Button
-            label="К списку заявок"
-            accessibilityLabel="Вернуться к списку заявок"
+            label={t.applicationGate.backToList}
+            accessibilityLabel={t.applicationGate.backToListA11y}
             testID={TEST_IDS.backToListButton}
             onPress={goToList}
           />

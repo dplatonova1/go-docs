@@ -20,17 +20,6 @@ export const RESET_IDLE: ResetState = { status: 'idle' };
 
 export const RESET_WORKING: ResetState = { status: 'working' };
 
-/**
- * Сообщения дедупликации (ADR-0018). Показываются вместо тихого
- * повторения обычного прикрепления: пользователь выбрал файл и вправе
- * знать, что второй копии не появилось.
- */
-export const DEDUPLICATION_NOTICE = {
-  reused:
-    'Этот файл уже был в библиотеке — прикреплён без повторной загрузки.',
-  alreadyAttached: 'Этот файл уже прикреплён к этому пункту.',
-} as const;
-
 /** Контракт экрана для тестов и e2e. */
 export const TEST_IDS = {
   screen: 'checklist-screen',

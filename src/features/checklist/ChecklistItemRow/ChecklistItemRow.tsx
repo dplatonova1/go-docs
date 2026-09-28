@@ -5,13 +5,18 @@
  *
  * Элементы озвучиваются по отдельности, а не одной группой: внутри
  * `accessible`-контейнера скринридер не дал бы нажать кнопку.
+ *
+ * Тексты берутся хуком, а не приходят пропсами: строка мемоизирована, и
+ * при смене языка с прежними пропсами она бы не перерисовалась —
+ * подписка на язык у неё своя (см. [`src/i18n`](../../../i18n)).
  */
 
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { useTranslation } from '../../../i18n';
 import { isAttached, type AttachedDocument } from '../model';
-import { STATUS_TEXT, TEST_ID_PREFIX, UNNAMED_FILE } from './constants';
+import { TEST_ID_PREFIX } from './constants';
 import {
   Container,
   ErrorText,
@@ -37,10 +42,13 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   onPickFromLibrary,
   onDetachFile,
 }: ChecklistItemRowProps) {
+  const t = useTranslation();
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
   const attached = isAttached(item);
-  const statusText = attached ? STATUS_TEXT.attached : STATUS_TEXT.notAttached;
+  const statusText = attached
+    ? t.checklistItem.statusAttached
+    : t.checklistItem.statusNotAttached;
 
   const handleAttach = useCallback(
     () => onAttach(item.id),
@@ -57,37 +65,42 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
     [item.id, onDetachFile],
   );
 
-  let attachLabel = attached ? 'Прикрепить ещё файл' : 'Прикрепить файл';
+  let attachLabel = attached
+    ? t.checklistItem.attachMore
+    : t.checklistItem.attach;
   if (isAttaching) {
-    attachLabel = 'Прикрепление…';
+    attachLabel = t.checklistItem.attaching;
   }
 
   return (
     <Container testID={testID}>
       <Label
-        accessibilityLabel={`Пункт ${number} из ${total}: ${item.label}`}
+        accessibilityLabel={t.checklistItem.labelA11y(number, total, item.label)}
         testID={`${testID}-label`}
       >
-        {`${number}. ${item.label}`}
+        {t.checklistItem.line(number, item.label)}
       </Label>
 
       <StatusBadge
         $attached={attached}
         accessible
-        accessibilityLabel={`Пункт ${number}: ${statusText.toLowerCase()}`}
+        accessibilityLabel={t.checklistItem.statusA11y(
+          number,
+          statusText.toLowerCase(),
+        )}
         testID={`${testID}-status`}
       >
         <StatusText $attached={attached}>{statusText}</StatusText>
       </StatusBadge>
 
       {item.documents.map((document, documentIndex) => {
-        const name = document.name ?? UNNAMED_FILE;
+        const name = document.name ?? t.checklistItem.unnamedFile;
         const isDetaching = detachingDocumentId === document.id;
 
         return (
           <FileRow key={document.id}>
             <FileName
-              accessibilityLabel={`Прикреплённый файл: ${name}`}
+              accessibilityLabel={t.checklistItem.fileA11y(name)}
               testID={`${testID}-file-${documentIndex}`}
               // Середина, а не конец: расширение в конце имени важнее.
               numberOfLines={1}
@@ -98,10 +111,16 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
 
             <Button
               variant="danger"
-              label={isDetaching ? 'Открепление…' : 'Открепить'}
+              label={
+                isDetaching ? t.checklistItem.detaching : t.checklist.detach
+              }
               // Вслух — что именно открепляется: «Открепить» без имени
               // файла в списке из нескольких ничего не говорит.
-              accessibilityLabel={`Открепить файл ${name} от пункта ${number}: ${item.label}`}
+              accessibilityLabel={t.checklistItem.detachA11y(
+                name,
+                number,
+                item.label,
+              )}
               testID={`${testID}-file-${documentIndex}-detach`}
               disabled={actionsDisabled}
               onPress={() => handleDetach(document)}
@@ -132,7 +151,7 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
       <Button
         variant="secondary"
         label={attachLabel}
-        accessibilityLabel={`Загрузить файл с устройства и прикрепить к пункту ${number}: ${item.label}`}
+        accessibilityLabel={t.checklistItem.attachA11y(number, item.label)}
         testID={`${testID}-attach`}
         disabled={actionsDisabled}
         onPress={handleAttach}
@@ -140,8 +159,11 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
 
       <Button
         variant="secondary"
-        label="Выбрать из библиотеки"
-        accessibilityLabel={`Прикрепить к пункту ${number}: ${item.label} файл, уже загруженный в приложение`}
+        label={t.checklistItem.pickFromLibrary}
+        accessibilityLabel={t.checklistItem.pickFromLibraryA11y(
+          number,
+          item.label,
+        )}
         testID={`${testID}-pick-from-library`}
         disabled={actionsDisabled}
         onPress={handlePickFromLibrary}

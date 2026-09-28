@@ -27,6 +27,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0018](./0018-deduplicate-documents-by-content-hash.md) | Дедупликация документов по SHA-256 содержимого | Accepted |
 | [0019](./0019-pdf-package-assembly.md) | Сборка финального PDF-пакета: реестр, сжатие снимков, share sheet | Accepted |
 | [0020](./0020-package-file-types-limited-to-images-and-pdf.md) | В пакет попадают только JPEG, PNG и PDF; конвертация docx отвергнута | Accepted |
+| [0021](./0021-runtime-localization.md) | Переключение языка (ru/en): свой типизированный словарь, выбор в файле настроек | Accepted |
 
 ## Когда заводить новый ADR
 

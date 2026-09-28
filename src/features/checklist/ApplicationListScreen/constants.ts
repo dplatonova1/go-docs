@@ -4,10 +4,6 @@ export const LOADING: ListState = { status: 'loading' };
 
 export const DELETE_IDLE: DeleteState = { status: 'idle' };
 
-export const EMPTY_HINT =
-  'Заявок пока нет. Создайте первую: понадобится название и список ' +
-  'документов с сайта ведомства.';
-
 /** Контракт экрана для тестов и e2e. */
 export const TEST_IDS = {
   screen: 'application-list-screen',
@@ -17,6 +13,7 @@ export const TEST_IDS = {
   retryButton: 'application-list-retry-button',
   createButton: 'create-application-button',
   libraryButton: 'open-document-library-button',
+  settingsButton: 'open-settings-button',
   deleteError: 'application-delete-error',
   empty: 'application-list-empty',
 } as const;

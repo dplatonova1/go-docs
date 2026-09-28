@@ -4,8 +4,6 @@ export const IDLE: SaveState = { status: 'idle' };
 
 export const SAVING: SaveState = { status: 'saving' };
 
-export const TITLE_REQUIRED_ERROR = 'Введите название заявки';
-
 /** Контракт экрана для тестов и e2e. */
 export const TEST_IDS = {
   screen: 'rename-application-screen',

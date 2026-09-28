@@ -3,64 +3,41 @@
  *
  * По коду `StorageError`, а не по тексту исключения: текст пишется для
  * разработчика и может содержать детали, которые пользователю ничего не
- * скажут. `Record<StorageErrorCode, string>` заставляет tsc напомнить о
- * сообщении, когда в `errors.ts` появится новый код.
+ * скажут. Полноту набора сторожит `satisfies Record<..., string>` в
+ * словарях (`src/i18n/locales`): tsc напомнит о сообщении, когда в
+ * `errors.ts` появится новый код.
+ *
+ * Словарь берётся в момент вызова, а не при загрузке модуля: язык
+ * меняется в рантайме, и снятая заранее ссылка застыла бы на старом
+ * (см. [`src/i18n/store.ts`](../../i18n/store.ts)).
  */
 
+import { translations } from '../../i18n';
 import { StorageErrorCode, isStorageError } from '../../storage/errors';
 import { isPackageAssemblyError } from '../package/errors';
-import { AttachmentError, type AttachmentErrorCode } from './errors';
+import { AttachmentError } from './errors';
 import { MAX_ATTACHMENT_MEGABYTES } from './model';
 
-const STORAGE_ERROR_MESSAGES = {
-  [StorageErrorCode.KeychainUnavailable]:
-    'Защищённое хранилище устройства недоступно. Разблокируйте устройство и попробуйте ещё раз.',
-  [StorageErrorCode.KeychainReadBackFailed]:
-    'Не удалось сохранить ключ шифрования на устройстве. Попробуйте ещё раз.',
-  [StorageErrorCode.EncryptionKeyLost]:
-    'Ключ шифрования на устройстве потерян, сохранённые данные недоступны.',
-  [StorageErrorCode.KeyFormatUnsupported]:
-    'Данные созданы более новой версией приложения. Обновите приложение.',
-  [StorageErrorCode.CsprngUnavailable]:
-    'Системный генератор случайных чисел недоступен. Перезапустите приложение.',
-  [StorageErrorCode.PathOutsideSandbox]:
-    'Внутренняя ошибка: недопустимый путь к файлу.',
-  [StorageErrorCode.InvalidPath]:
-    'Внутренняя ошибка: недопустимый путь к файлу.',
-  [StorageErrorCode.FileNotFound]: 'Файл не найден.',
-  [StorageErrorCode.FileCorrupted]:
-    'Файл повреждён или не может быть расшифрован.',
-  [StorageErrorCode.FileFormatUnsupported]:
-    'Файл создан более новой версией приложения. Обновите приложение.',
-  [StorageErrorCode.FileTooLarge]: `Файл больше ${MAX_ATTACHMENT_MEGABYTES} МБ. Уменьшите его — например, сожмите PDF или сделайте фото с меньшим разрешением — и попробуйте снова.`,
-  [StorageErrorCode.NotEnoughSpace]:
-    'На устройстве не хватает свободного места. Освободите место и попробуйте снова.',
-  [StorageErrorCode.DatabaseFailure]:
-    'Не удалось обратиться к данным на устройстве. Попробуйте ещё раз.',
-} as const satisfies Record<StorageErrorCode, string>;
-
-const ATTACHMENT_ERROR_MESSAGES = {
-  'picker-failed': 'Не удалось открыть выбор файла. Попробуйте ещё раз.',
-  'copy-failed':
-    'Не удалось получить файл. Если он хранится в облаке, откройте его в приложении облака, чтобы он загрузился на телефон, и попробуйте снова.',
-  unsupported:
-    'Прикрепить можно JPEG, PNG или PDF. Сохраните файл в одном из этих форматов и попробуйте снова.',
-} as const satisfies Record<AttachmentErrorCode, string>;
-
-const PACKAGE_ASSEMBLY_MESSAGE =
-  'Не удалось собрать пакет из документов. Попробуйте ещё раз.';
-
-const UNKNOWN_ERROR_MESSAGE = 'Непредвиденная ошибка. Попробуйте ещё раз.';
-
 export function describeError(error: unknown): string {
+  const messages = translations().errors;
+
   if (isPackageAssemblyError(error)) {
-    return PACKAGE_ASSEMBLY_MESSAGE;
+    return messages.packageAssembly;
   }
+
   if (error instanceof AttachmentError) {
-    return ATTACHMENT_ERROR_MESSAGES[error.code];
+    return messages.attachment[error.code];
   }
+
   if (isStorageError(error)) {
-    return STORAGE_ERROR_MESSAGES[error.code];
+    // Единственный код с подстановкой: предел размера задаёт модель
+    // чек-листа, и словарь о ней не знает.
+    if (error.code === StorageErrorCode.FileTooLarge) {
+      return messages.storage[error.code](MAX_ATTACHMENT_MEGABYTES);
+    }
+
+    return messages.storage[error.code];
   }
-  return UNKNOWN_ERROR_MESSAGE;
+
+  return messages.unknown;
 }

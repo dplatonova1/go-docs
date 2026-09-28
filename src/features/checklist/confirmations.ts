@@ -1,22 +1,23 @@
 /**
- * Тексты подтверждения необратимых действий: удаление заявки и
- * открепление файла от пункта.
+ * Тексты подтверждения необратимых действий: удаление заявки,
+ * открепление файла от пункта и удаление файла из библиотеки.
  *
- * Оба диалога называют последствие прямо. Модуль чистый — без доступа к
- * БД и файлам, чтобы тесты экранов проверяли настоящие формулировки.
+ * Все три диалога называют последствие прямо. Модуль остаётся чистым —
+ * без доступа к БД и файлам, — чтобы тесты экранов проверяли настоящие
+ * формулировки. Сами формулировки живут в словарях
+ * ([`src/i18n`](../../i18n)); здесь — из каких частей собирается текст.
  *
- * Числа — в скобках, а не со склонением («7 пунктов», «1 пункт»): так
- * текст остаётся верным при любом количестве без правил плюрализации.
+ * Числа — в скобках, а не со склонением («пунктов: 7», «пунктов: 1»):
+ * так текст остаётся верным при любом количестве без правил
+ * плюрализации, одинаково в русском и английском.
  */
 
+import { translations } from '../../i18n';
 import type {
   ApplicationDeletionImpact,
   AttachedDocument,
   DocumentUsage,
 } from './model';
-
-/** Показывается вместо имени, если источник его не сообщил. */
-const UNNAMED_DOCUMENT = 'без имени';
 
 export type Confirmation = {
   readonly title: string;
@@ -35,20 +36,17 @@ export function applicationDeletionConfirmation(
   applicationTitle: string,
   impact: ApplicationDeletionImpact,
 ): Confirmation {
-  const parts = [
-    `Будут удалены пункты чек-листа этой заявки (${impact.itemCount}).`,
-  ];
+  const t = translations().confirmations;
+  const parts = [t.deleteApplicationItems(impact.itemCount)];
 
   if (impact.documentCount > 0) {
-    parts.push(
-      `Прикреплённые документы (${impact.documentCount}) останутся в библиотеке — их можно прикрепить к другой заявке.`,
-    );
+    parts.push(t.deleteApplicationDocuments(impact.documentCount));
   }
 
-  parts.push('Отменить удаление заявки нельзя.');
+  parts.push(t.deleteApplicationIrreversible);
 
   return {
-    title: `Удалить заявку «${applicationTitle}»?`,
+    title: t.deleteApplicationTitle(applicationTitle),
     message: parts.join(' '),
   };
 }
@@ -68,18 +66,16 @@ export function documentDetachConfirmation(
   document: AttachedDocument,
   isLastFileOfItem: boolean,
 ): Confirmation {
-  const name = document.name ?? UNNAMED_DOCUMENT;
-  const parts = [
-    'Файл перестанет быть прикреплённым к этому пункту.',
-    'Списка загруженных документов в приложении пока нет, поэтому найти его снова будет нельзя — если он понадобится, прикрепите файл заново.',
-  ];
+  const t = translations().confirmations;
+  const name = document.name ?? t.unnamedDocument;
+  const parts = [t.detachLink, t.detachWhereToFind];
 
   if (isLastFileOfItem) {
-    parts.push(`Пункт «${itemLabel}» снова станет неотмеченным.`);
+    parts.push(t.detachUnchecks(itemLabel));
   }
 
   return {
-    title: `Открепить файл «${name}»?`,
+    title: t.detachTitle(name),
     message: parts.join(' '),
   };
 }
@@ -97,31 +93,32 @@ export function libraryDocumentDeletionConfirmation(
   documentName: string | null,
   usage: DocumentUsage,
 ): Confirmation {
-  const name = documentName ?? UNNAMED_DOCUMENT;
-  const parts = [
-    'Файл будет удалён с устройства без возможности восстановления.',
-  ];
+  const t = translations().confirmations;
+  const name = documentName ?? t.unnamedDocument;
+  const parts = [t.deleteDocumentIrreversible];
 
   if (usage.itemCount > 0) {
     const where = usage.applications
-      .map(
-        application =>
-          `«${application.applicationTitle}» — пунктов: ${application.itemCount}`,
+      .map(application =>
+        t.deleteDocumentUsageEntry(
+          application.applicationTitle,
+          application.itemCount,
+        ),
       )
       .join('; ');
 
     parts.push(
-      `Сейчас он прикреплён к пунктам чек-листа (${usage.itemCount}) в заявках: ${where}.`,
-      'Из этих чек-листов он пропадёт, а пункты, где других файлов нет, снова станут неотмеченными.',
+      t.deleteDocumentUsage(usage.itemCount, where),
+      t.deleteDocumentConsequence,
     );
   } else {
-    parts.push('Сейчас он не прикреплён ни к одному пункту чек-листа.');
+    parts.push(t.deleteDocumentUnused);
   }
 
-  parts.push('Отменить это нельзя.');
+  parts.push(t.deleteDocumentTail);
 
   return {
-    title: `Удалить файл «${name}» из библиотеки?`,
+    title: t.deleteDocumentTitle(name),
     message: parts.join(' '),
   };
 }

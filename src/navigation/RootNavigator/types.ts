@@ -21,6 +21,7 @@ export type RootStackParamList = {
   RenameApplication: { applicationId: ApplicationId };
   DocumentLibrary: undefined;
   PickDocumentFromLibrary: { itemId: ChecklistItemId };
+  Settings: undefined;
 };
 
 /**

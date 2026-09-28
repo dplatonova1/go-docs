@@ -5,6 +5,9 @@ module.exports = {
   // правок, а Jest по умолчанию не трансформирует node_modules: без этих
   // исключений тест, куда попал такой импорт, падает с невнятным
   // «Unexpected token 'export'» вместо понятной ошибки.
+  // Язык по умолчанию — русский, иначе его задавал бы фолбэк
+  // `detectSystemLocale()`, а тесты проверяют формулировки дословно.
+  setupFilesAfterEnv: ['<rootDir>/src/test-utils/setupLocale.ts'],
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community|-documents)?|@react-navigation|react-native-screens|react-native-safe-area-context|@noble)/)',
   ],

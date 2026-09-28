@@ -24,13 +24,3 @@ export const TEST_IDS = {
   emptyItemsError: 'draft-empty-items-error',
   saveError: 'save-application-error',
 } as const;
-
-export const TITLE_REQUIRED_ERROR = 'Укажите название заявки';
-
-export const NOTHING_PARSED_ERROR =
-  'В тексте не нашлось ни одного пункта. Проверьте текст или добавьте пункты вручную.';
-
-export const NO_ITEMS_ERROR = 'Добавьте хотя бы один пункт';
-
-export const EMPTY_ITEMS_ERROR =
-  'Есть пустые пункты — заполните или удалите их';

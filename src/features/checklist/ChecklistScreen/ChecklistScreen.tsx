@@ -30,6 +30,7 @@ import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
+import { translations, useTranslation } from '../../../i18n';
 import {
   buildPackage,
   preparePackagePlan,
@@ -63,7 +64,6 @@ import {
 } from '../repository';
 import {
   ATTACH_IDLE,
-  DEDUPLICATION_NOTICE,
   DETACH_IDLE,
   PACKAGE_IDLE,
   PACKAGE_PREPARING,
@@ -116,6 +116,7 @@ export function ChecklistScreen({
   onPickFromLibrary,
   onReset,
 }: ChecklistScreenProps) {
+  const t = useTranslation();
   const theme = useTheme();
   const [state, setState] = useState<ItemsState>(LOADING);
   const [attempt, setAttempt] = useState(0);
@@ -192,7 +193,9 @@ export function ChecklistScreen({
               }
             : current,
         );
-        AccessibilityInfo.announceForAccessibility('Файл прикреплён');
+        AccessibilityInfo.announceForAccessibility(
+          translations().checklist.announceAttached,
+        );
       }
 
       // Дедупликация — не ошибка, но и не обычное прикрепление: файл не
@@ -201,16 +204,15 @@ export function ChecklistScreen({
         setAttachState({
           status: 'notice',
           itemId,
-          message: DEDUPLICATION_NOTICE.reused,
+          message: translations().checklist.reusedNotice,
         });
       } else if (result.status === 'already-attached') {
-        AccessibilityInfo.announceForAccessibility(
-          DEDUPLICATION_NOTICE.alreadyAttached,
-        );
+        const notice = translations().checklist.alreadyAttachedNotice;
+        AccessibilityInfo.announceForAccessibility(notice);
         setAttachState({
           status: 'notice',
           itemId,
-          message: DEDUPLICATION_NOTICE.alreadyAttached,
+          message: notice,
         });
       } else {
         setAttachState(ATTACH_IDLE);
@@ -244,7 +246,9 @@ export function ChecklistScreen({
               }
             : current,
         );
-        AccessibilityInfo.announceForAccessibility('Файл откреплён');
+        AccessibilityInfo.announceForAccessibility(
+          translations().checklist.announceDetached,
+        );
         setDetachState(DETACH_IDLE);
       } catch (error) {
         setDetachState({
@@ -279,9 +283,9 @@ export function ChecklistScreen({
       );
 
       Alert.alert(title, message, [
-        { text: 'Отмена', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Открепить',
+          text: t.checklist.detach,
           style: 'destructive',
           onPress: () => {
             confirmDetach(itemId, document.id);
@@ -289,7 +293,7 @@ export function ChecklistScreen({
         },
       ]);
     },
-    [state, confirmDetach],
+    [state, confirmDetach, t],
   );
 
   const confirmReset = useCallback(async () => {
@@ -322,16 +326,16 @@ export function ChecklistScreen({
     );
     Alert.alert(title, message, [
       // Первой и с ролью cancel: случайное касание не должно удалять.
-      { text: 'Отмена', style: 'cancel' },
+      { text: t.common.cancel, style: 'cancel' },
       {
-        text: 'Удалить',
+        text: t.common.delete,
         style: 'destructive',
         onPress: () => {
           confirmReset();
         },
       },
     ]);
-  }, [application.id, application.title, confirmReset]);
+  }, [application.id, application.title, confirmReset, t]);
 
   const share = useCallback(async (result: PackageBuildResult) => {
     try {
@@ -362,7 +366,9 @@ export function ChecklistScreen({
       });
 
       setPackageState({ status: 'done', result });
-      AccessibilityInfo.announceForAccessibility('Пакет собран');
+      AccessibilityInfo.announceForAccessibility(
+        translations().checklist.announcePackageBuilt,
+      );
       await share(result);
     } catch (error) {
       setPackageState({ status: 'failed', message: describeError(error) });
@@ -425,7 +431,7 @@ export function ChecklistScreen({
   const header = (
     <Header>
       {state.status === 'loaded' ? (
-        <Summary>{`Пунктов в чек-листе: ${total}`}</Summary>
+        <Summary>{t.checklist.summary(total)}</Summary>
       ) : null}
     </Header>
   );
@@ -437,7 +443,7 @@ export function ChecklistScreen({
           {/* Без «всё готово»: пакет собирается и при неполном
               чек-листе, а решать, готов он или нет, человеку. */}
           <Summary testID={TEST_IDS.packageSummary}>
-            {`Прикреплено ${attachedCount} из ${total} пунктов чек-листа`}
+            {t.checklist.attachedSummary(attachedCount, total)}
           </Summary>
 
           {packageState.status === 'building' ? (
@@ -445,7 +451,10 @@ export function ChecklistScreen({
               accessibilityLiveRegion="polite"
               testID={TEST_IDS.packageProgress}
             >
-              {`Обрабатывается ${packageState.processed} из ${packageState.total}`}
+              {t.checklist.buildProgress(
+                packageState.processed,
+                packageState.total,
+              )}
             </NoticeText>
           ) : null}
 
@@ -454,7 +463,7 @@ export function ChecklistScreen({
               accessibilityLiveRegion="polite"
               testID={TEST_IDS.packageResult}
             >
-              {`Пакет собран: страниц — ${packageState.result.pageCount}`}
+              {t.checklist.buildResult(packageState.result.pageCount)}
             </NoticeText>
           ) : null}
 
@@ -480,8 +489,10 @@ export function ChecklistScreen({
           ) : null}
 
           <Button
-            label={isBuildingPackage ? 'Сборка…' : 'Собрать пакет'}
-            accessibilityLabel="Собрать все прикреплённые документы в один PDF-файл"
+            label={
+              isBuildingPackage ? t.checklist.building : t.checklist.build
+            }
+            accessibilityLabel={t.checklist.buildA11y}
             testID={TEST_IDS.packageButton}
             disabled={isBusy}
             onPress={handleBuildPackage}
@@ -490,8 +501,8 @@ export function ChecklistScreen({
           {packageState.status === 'done' ? (
             <Button
               variant="secondary"
-              label="Отправить ещё раз"
-              accessibilityLabel="Отправить собранный пакет ещё раз"
+              label={t.checklist.shareAgain}
+              accessibilityLabel={t.checklist.shareAgainA11y}
               testID={TEST_IDS.packageShareButton}
               disabled={isBusy}
               onPress={() => share(packageState.result)}
@@ -499,10 +510,7 @@ export function ChecklistScreen({
           ) : null}
         </PackageBlock>
 
-        <Summary>
-          Список документов составлен неверно? Заявку можно удалить и создать
-          заново — прикреплённые файлы останутся в библиотеке.
-        </Summary>
+        <Summary>{t.checklist.resetHint}</Summary>
 
         {resetState.status === 'failed' ? (
           <ErrorText
@@ -516,8 +524,10 @@ export function ChecklistScreen({
 
         <Button
           variant="danger"
-          label={isResetting ? 'Удаление…' : 'Удалить заявку'}
-          accessibilityLabel="Удалить эту заявку"
+          label={
+            isResetting ? t.common.deleting : t.checklist.deleteApplication
+          }
+          accessibilityLabel={t.checklist.deleteApplicationA11y}
           testID={TEST_IDS.resetButton}
           disabled={isBusy}
           onPress={handleResetPress}
@@ -548,7 +558,7 @@ export function ChecklistScreen({
         <ActivityIndicator
           size="large"
           color={theme.colors.primary}
-          accessibilityLabel="Загрузка пунктов чек-листа"
+          accessibilityLabel={t.checklist.loadingA11y}
           testID={TEST_IDS.loading}
         />
       ) : (
@@ -561,8 +571,8 @@ export function ChecklistScreen({
             {state.message}
           </ErrorText>
           <Button
-            label="Повторить"
-            accessibilityLabel="Повторить загрузку пунктов чек-листа"
+            label={t.common.retry}
+            accessibilityLabel={t.checklist.retryA11y}
             testID={TEST_IDS.retryButton}
             onPress={retry}
           />

@@ -65,6 +65,7 @@ type Handlers = {
   onRename?: jest.Mock;
   onCreate?: jest.Mock;
   onOpenLibrary?: jest.Mock;
+  onOpenSettings?: jest.Mock;
   isFocused?: boolean;
 };
 
@@ -73,6 +74,7 @@ async function renderScreen({
   onRename = jest.fn(),
   onCreate = jest.fn(),
   onOpenLibrary = jest.fn(),
+  onOpenSettings = jest.fn(),
   isFocused = true,
 }: Handlers = {}) {
   const tree = await render(
@@ -82,10 +84,18 @@ async function renderScreen({
       onRename={onRename}
       onCreate={onCreate}
       onOpenLibrary={onOpenLibrary}
+      onOpenSettings={onOpenSettings}
     />,
   );
   await flush();
-  return { tree, onOpen, onRename, onCreate, onOpenLibrary };
+  return {
+    tree,
+    onOpen,
+    onRename,
+    onCreate,
+    onOpenLibrary,
+    onOpenSettings,
+  };
 }
 
 function lastAlertButtons(): AlertButton[] {

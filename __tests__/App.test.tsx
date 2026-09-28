@@ -20,6 +20,13 @@ jest.mock('react-native-safe-area-context', () => {
   return mock.default ?? mock;
 });
 
+// Выбор языка лежит в файле, а файловая система — нативная.
+// Мок на нашей границе: язык тестов задаёт `test-utils/setupLocale.ts`.
+jest.mock('../src/i18n/persistence', () => ({
+  loadStoredLocale: jest.fn().mockResolvedValue(undefined),
+  changeLocale: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../src/db/client', () => ({
   runMigrations: jest.fn().mockResolvedValue(undefined),
 }));

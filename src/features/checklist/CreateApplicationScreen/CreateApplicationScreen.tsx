@@ -29,6 +29,7 @@ import {
 import { Button } from '../../../components/Button';
 import { Screen } from '../../../components/Screen';
 import { TextField } from '../../../components/TextField';
+import { translations, useTranslation } from '../../../i18n';
 import { DraftItemRow } from '../DraftItemRow';
 import {
   createDraftItems,
@@ -46,14 +47,10 @@ import { parseChecklistText } from '../parseChecklistText';
 import { createApplication } from '../repository';
 import {
   EMPTY_DRAFT,
-  EMPTY_ITEMS_ERROR,
   IDLE,
-  NOTHING_PARSED_ERROR,
-  NO_ITEMS_ERROR,
   PASTED_TEXT_MIN_LINES,
   SAVING,
   TEST_IDS,
-  TITLE_REQUIRED_ERROR,
 } from './constants';
 import {
   Footer,
@@ -69,6 +66,7 @@ export function CreateApplicationScreen({
   onCreated,
   onDirtyChange,
 }: CreateApplicationScreenProps) {
+  const t = useTranslation();
   const [title, setTitle] = useState('');
   const [pastedText, setPastedText] = useState('');
   const [items, dispatch] = useReducer(draftReducer, EMPTY_DRAFT);
@@ -110,7 +108,7 @@ export function CreateApplicationScreen({
       });
       setFocusKey(null);
       AccessibilityInfo.announceForAccessibility(
-        `Найдено пунктов: ${labels.length}. Проверьте список перед сохранением.`,
+        translations().createApplication.announceParsed(labels.length),
       );
     },
     [nextKey],
@@ -131,18 +129,18 @@ export function CreateApplicationScreen({
 
     // Список уже мог быть поправлен руками — молча затирать правки нельзя.
     Alert.alert(
-      'Заменить список?',
-      `Текущие пункты (${items.length}) и правки в них будут заменены результатом разбора.`,
+      t.createApplication.replaceTitle,
+      t.createApplication.replaceMessage(items.length),
       [
-        { text: 'Отмена', style: 'cancel' },
+        { text: t.common.cancel, style: 'cancel' },
         {
-          text: 'Заменить',
+          text: t.createApplication.replaceConfirm,
           style: 'destructive',
           onPress: () => applyParsed(labels),
         },
       ],
     );
-  }, [pastedText, items.length, applyParsed]);
+  }, [pastedText, items.length, applyParsed, t]);
 
   const handleChangeLabel = useCallback((key: DraftItemKey, label: string) => {
     dispatch({ type: 'edit', key, label });
@@ -153,8 +151,11 @@ export function CreateApplicationScreen({
   const handleMove = useCallback(
     (key: DraftItemKey, direction: MoveDirection) => {
       dispatch({ type: 'move', key, direction });
+      const announcements = translations().createApplication;
       AccessibilityInfo.announceForAccessibility(
-        direction === 'up' ? 'Пункт перемещён выше' : 'Пункт перемещён ниже',
+        direction === 'up'
+          ? announcements.announceMovedUp
+          : announcements.announceMovedDown,
       );
     },
     [],
@@ -162,7 +163,9 @@ export function CreateApplicationScreen({
 
   const handleRemove = useCallback((key: DraftItemKey) => {
     dispatch({ type: 'remove', key });
-    AccessibilityInfo.announceForAccessibility('Пункт удалён');
+    AccessibilityInfo.announceForAccessibility(
+      translations().createApplication.announceRemoved,
+    );
   }, []);
 
   const handleAdd = useCallback(() => {
@@ -233,47 +236,46 @@ export function CreateApplicationScreen({
   const header = (
     <Header>
       <TextField
-        label="Название заявки"
-        accessibilityLabel="Название заявки"
+        label={t.createApplication.titleLabel}
+        accessibilityLabel={t.createApplication.titleLabel}
         testID={TEST_IDS.titleInput}
-        placeholder="Например, ВНЖ в Сербии"
+        placeholder={t.createApplication.titlePlaceholder}
         value={title}
         onChangeText={setTitle}
         returnKeyType="next"
-        error={errors?.titleMissing ? TITLE_REQUIRED_ERROR : undefined}
+        error={
+          errors?.titleMissing ? t.createApplication.titleRequired : undefined
+        }
       />
 
       <TextField
-        label="Список документов"
-        accessibilityLabel="Текст списка документов для разбора на пункты"
+        label={t.createApplication.textLabel}
+        accessibilityLabel={t.createApplication.textA11y}
         testID={TEST_IDS.checklistTextInput}
-        placeholder="Вставьте список документов с сайта ведомства"
+        placeholder={t.createApplication.textPlaceholder}
         value={pastedText}
         onChangeText={handlePastedTextChange}
         multiline
         minLines={PASTED_TEXT_MIN_LINES}
         autoCorrect={false}
-        error={nothingParsed ? NOTHING_PARSED_ERROR : undefined}
+        error={nothingParsed ? t.createApplication.nothingParsed : undefined}
       />
 
       <Button
         variant="secondary"
-        label="Разобрать на пункты"
-        accessibilityLabel="Разобрать вставленный текст на пункты чек-листа"
+        label={t.createApplication.parse}
+        accessibilityLabel={t.createApplication.parseA11y}
         testID={TEST_IDS.parseButton}
         disabled={pastedText.trim().length === 0}
         onPress={handleParse}
       />
 
       <SectionTitle accessibilityRole="header">
-        {`Пункты чек-листа (${items.length})`}
+        {t.createApplication.sectionTitle(items.length)}
       </SectionTitle>
 
       {items.length === 0 ? (
-        <Hint>
-          Вставьте текст и нажмите «Разобрать на пункты» или добавьте пункты
-          вручную. Перед сохранением список можно поправить.
-        </Hint>
+        <Hint>{t.createApplication.hint}</Hint>
       ) : null}
     </Header>
   );
@@ -282,8 +284,8 @@ export function CreateApplicationScreen({
     <Footer>
       <Button
         variant="secondary"
-        label="Добавить пункт"
-        accessibilityLabel="Добавить пункт чек-листа вручную"
+        label={t.createApplication.addItem}
+        accessibilityLabel={t.createApplication.addItemA11y}
         testID={TEST_IDS.addItemButton}
         onPress={handleAdd}
       />
@@ -294,7 +296,7 @@ export function CreateApplicationScreen({
           accessibilityLiveRegion="polite"
           testID={TEST_IDS.titleError}
         >
-          {TITLE_REQUIRED_ERROR}
+          {t.createApplication.titleRequired}
         </FormError>
       ) : null}
 
@@ -304,7 +306,7 @@ export function CreateApplicationScreen({
           accessibilityLiveRegion="polite"
           testID={TEST_IDS.noItemsError}
         >
-          {NO_ITEMS_ERROR}
+          {t.createApplication.noItems}
         </FormError>
       ) : null}
 
@@ -314,7 +316,7 @@ export function CreateApplicationScreen({
           accessibilityLiveRegion="polite"
           testID={TEST_IDS.emptyItemsError}
         >
-          {EMPTY_ITEMS_ERROR}
+          {t.createApplication.emptyItems}
         </FormError>
       ) : null}
 
@@ -329,8 +331,8 @@ export function CreateApplicationScreen({
       ) : null}
 
       <Button
-        label={isSaving ? 'Сохранение…' : 'Сохранить заявку'}
-        accessibilityLabel="Сохранить заявку и пункты чек-листа"
+        label={isSaving ? t.common.saving : t.createApplication.save}
+        accessibilityLabel={t.createApplication.saveA11y}
         testID={TEST_IDS.saveButton}
         disabled={isSaving}
         onPress={handleSave}

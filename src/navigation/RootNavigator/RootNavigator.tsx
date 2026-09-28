@@ -18,6 +18,7 @@ import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../components/Button';
 import { ALL_EDGES, Screen } from '../../components/Screen';
+import { useTranslation } from '../../i18n';
 import {
   ApplicationListRoute,
   ChecklistRoute,
@@ -25,8 +26,9 @@ import {
   DocumentLibraryRoute,
   PickDocumentFromLibraryRoute,
   RenameApplicationRoute,
+  SettingsRoute,
 } from '../routes';
-import { SCREEN_TITLES, TEST_IDS } from './constants';
+import { TEST_IDS } from './constants';
 import { toNavigationTheme } from './navigationTheme';
 import { Centered, Message, Title } from './styles';
 import { useBootstrap } from './useBootstrap';
@@ -35,6 +37,7 @@ import type { RootStackParamList } from './types';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export function RootNavigator() {
+  const t = useTranslation();
   const theme = useTheme();
   const isDark = useColorScheme() === 'dark';
   const { state, retry } = useBootstrap();
@@ -58,7 +61,7 @@ export function RootNavigator() {
             <ActivityIndicator
               size="large"
               color={theme.colors.primary}
-              accessibilityLabel="Загрузка данных"
+              accessibilityLabel={t.bootstrap.loadingA11y}
             />
           </Centered>
         </Screen>
@@ -67,13 +70,13 @@ export function RootNavigator() {
     case 'failed':
       return (
         <Screen edges={ALL_EDGES} testID={TEST_IDS.failed}>
-          <Title accessibilityRole="header">Данные недоступны</Title>
+          <Title accessibilityRole="header">{t.bootstrap.failedTitle}</Title>
           <Message accessibilityRole="alert" accessibilityLiveRegion="polite">
             {state.message}
           </Message>
           <Button
-            label="Повторить"
-            accessibilityLabel="Повторить открытие данных"
+            label={t.common.retry}
+            accessibilityLabel={t.bootstrap.retryA11y}
             testID={TEST_IDS.retryButton}
             onPress={retry}
           />
@@ -90,7 +93,7 @@ export function RootNavigator() {
             <Stack.Screen
               name="ApplicationList"
               component={ApplicationListRoute}
-              options={{ title: SCREEN_TITLES.applicationList }}
+              options={{ title: t.navigation.applicationList }}
             />
             {/* Заголовок — название заявки, его ставит сам маршрут после
                 загрузки. */}
@@ -98,17 +101,22 @@ export function RootNavigator() {
             <Stack.Screen
               name="CreateApplication"
               component={CreateApplicationRoute}
-              options={{ title: SCREEN_TITLES.createApplication }}
+              options={{ title: t.navigation.createApplication }}
             />
             <Stack.Screen
               name="DocumentLibrary"
               component={DocumentLibraryRoute}
-              options={{ title: SCREEN_TITLES.documentLibrary }}
+              options={{ title: t.navigation.documentLibrary }}
             />
             <Stack.Screen
               name="PickDocumentFromLibrary"
               component={PickDocumentFromLibraryRoute}
-              options={{ title: SCREEN_TITLES.pickDocument }}
+              options={{ title: t.navigation.pickDocument }}
+            />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsRoute}
+              options={{ title: t.navigation.settings }}
             />
             {/* Модально: переименование — короткий шаг поверх списка, из
                 которого возвращаются туда же. */}
@@ -116,7 +124,7 @@ export function RootNavigator() {
               name="RenameApplication"
               component={RenameApplicationRoute}
               options={{
-                title: SCREEN_TITLES.renameApplication,
+                title: t.navigation.renameApplication,
                 presentation: 'modal',
               }}
             />
