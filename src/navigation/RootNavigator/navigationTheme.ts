@@ -12,8 +12,10 @@ import {
   DefaultTheme,
   type Theme as NavigationTheme,
 } from '@react-navigation/native';
+import type { NativeStackNavigationOptions } from '@react-navigation/native-stack';
 
 import type { AppTheme } from '../../theme/theme';
+import { renderHeaderBack } from '../HeaderBackButton';
 import { FONTS } from '../../theme/typography';
 
 /**
@@ -41,7 +43,8 @@ export function toNavigationTheme(
     fonts,
     colors: {
       ...base.colors,
-      primary: theme.colors.primary,
+      // Навигация красит этим цветом элементы без заливки.
+      primary: theme.colors.indicator,
       background: theme.colors.background,
       // Шапка — поверхность над фоном экрана, как карточки.
       card: theme.colors.surface,
@@ -49,5 +52,20 @@ export function toNavigationTheme(
       border: theme.colors.divider,
       notification: theme.colors.danger,
     },
+  };
+}
+
+/**
+ * Общие опции шапки стеков: своя кнопка «назад» (`HeaderBackButton`).
+ * Она и заголовок — цветом `text`, а не `primary`: тёмно-зелёный
+ * `primary` тёмной палитры на тёмной шапке не читается. Фон шапки —
+ * `card` из навигационной темы выше.
+ */
+export function toStackScreenOptions(
+  theme: AppTheme,
+): NativeStackNavigationOptions {
+  return {
+    headerTintColor: theme.colors.text,
+    headerLeft: renderHeaderBack,
   };
 }

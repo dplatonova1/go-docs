@@ -719,20 +719,23 @@ export function listLibraryDocuments(
 export function getDocumentUsage(
   documentId: DocumentId,
 ): Promise<DocumentUsage> {
-  return guarded('Не удалось посчитать, где используется документ', async () => {
-    const db = await getDb();
-    const result = await db.execute(SELECT_DOCUMENT_USAGE, [documentId]);
+  return guarded(
+    'Не удалось посчитать, где используется документ',
+    async () => {
+      const db = await getDb();
+      const result = await db.execute(SELECT_DOCUMENT_USAGE, [documentId]);
 
-    const applications = result.rows.map(row => ({
-      applicationTitle: readText(row, 'applications', 'title'),
-      itemCount: readInteger(row, 'COUNT(*)', 'count'),
-    }));
+      const applications = result.rows.map(row => ({
+        applicationTitle: readText(row, 'applications', 'title'),
+        itemCount: readInteger(row, 'COUNT(*)', 'count'),
+      }));
 
-    return {
-      itemCount: applications.reduce((sum, row) => sum + row.itemCount, 0),
-      applications,
-    };
-  });
+      return {
+        itemCount: applications.reduce((sum, row) => sum + row.itemCount, 0),
+        applications,
+      };
+    },
+  );
 }
 
 /**
@@ -784,9 +787,7 @@ export function attachLibraryDocumentToItem(
  *
  * @returns путь удалённого файла или `null`, если записи уже не было.
  */
-export function deleteDocument(
-  documentId: DocumentId,
-): Promise<string | null> {
+export function deleteDocument(documentId: DocumentId): Promise<string | null> {
   return guarded('Не удалось удалить документ', () =>
     withTransaction(async tx => {
       const found = await tx.execute(SELECT_DOCUMENT_FILE_PATH, [documentId]);
@@ -856,9 +857,7 @@ export function getApplicationDeletionImpact(
  * операций здесь больше нет вообще, а с ними ушёл и порядок «сначала БД,
  * потом диск» из ADR-0012.
  */
-export function deleteApplication(
-  applicationId: ApplicationId,
-): Promise<void> {
+export function deleteApplication(applicationId: ApplicationId): Promise<void> {
   return guarded('Не удалось удалить заявку', async () => {
     const db = await getDb();
     await db.execute(DELETE_APPLICATION, [applicationId]);

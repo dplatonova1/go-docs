@@ -5,7 +5,6 @@ import { FONTS, textSize } from '../../../theme/typography';
 /** См. `CreateApplicationScreen/styles.ts`. */
 export const listContentStyle = toStyleSheet(css`
   gap: 8px;
-  padding-bottom: 24px;
 `);
 
 export const Header = styled.View`

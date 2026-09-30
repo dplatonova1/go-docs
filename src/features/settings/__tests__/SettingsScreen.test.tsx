@@ -1,5 +1,5 @@
 /**
- * Экран настроек: переключение языка.
+ * Экран настроек: переключение языка и темы.
  *
  * Главное свойство — экран перерисовывается на новом языке сразу, без
  * повторного открытия: ради этого `useTranslation` подписан на стор
@@ -38,7 +38,16 @@ jest.mock('../../../i18n/persistence', () => ({
   changeLocale: jest.fn(),
 }));
 
+// Настоящий модуль темы зовёт нативный `Appearance` и пишет файл; его
+// проверяет `theme/__tests__/themeMode.test.ts`.
+jest.mock('../../../theme/themeMode', () => ({
+  THEME_MODES: ['system', 'light', 'dark'],
+  getThemeMode: jest.fn(),
+  changeThemeMode: jest.fn(),
+}));
+
 const persistence = require('../../../i18n/persistence');
+const themeMode = require('../../../theme/themeMode');
 
 const RU = 'settings-locale-ru';
 const EN = 'settings-locale-en';
@@ -48,6 +57,8 @@ beforeEach(() => {
   persistence.changeLocale.mockImplementation(async (locale: 'ru' | 'en') => {
     setLocale(locale);
   });
+  themeMode.getThemeMode.mockReturnValue('system');
+  themeMode.changeThemeMode.mockResolvedValue(undefined);
 });
 
 afterEach(cleanup);
@@ -111,10 +122,7 @@ it('неудачная запись выбора показывает ошибк
   // нажатие, а сообщение говорит лишь, что выбор не переживёт перезапуск.
   persistence.changeLocale.mockImplementation(async (locale: 'ru' | 'en') => {
     setLocale(locale);
-    throw new StorageError(
-      StorageErrorCode.NotEnoughSpace,
-      'место кончилось',
-    );
+    throw new StorageError(StorageErrorCode.NotEnoughSpace, 'место кончилось');
   });
 
   const tree = await renderScreen();
@@ -132,4 +140,44 @@ it('у каждого интерактивного элемента есть п�
   const tree = await renderScreen();
 
   expect(interactiveWithoutA11y(tree)).toEqual([]);
+});
+
+describe('тема', () => {
+  it('три варианта, по умолчанию — как в системе', async () => {
+    const tree = await renderScreen();
+
+    expect(texts(tree)).toEqual(
+      expect.arrayContaining(['Как в системе', 'Светлая', 'Тёмная']),
+    );
+    expect(
+      findByTestId(tree, 'settings-theme-system').props.accessibilityState,
+    ).toEqual({ checked: true });
+  });
+
+  it('нажатие применяет тему и отмечает выбор', async () => {
+    const tree = await renderScreen();
+
+    await press(tree, 'settings-theme-dark');
+    await flush();
+
+    expect(themeMode.changeThemeMode).toHaveBeenCalledWith('dark');
+    expect(
+      findByTestId(tree, 'settings-theme-dark').props.accessibilityState,
+    ).toEqual({ checked: true });
+    expect(
+      findByTestId(tree, 'settings-theme-system').props.accessibilityState,
+    ).toEqual({ checked: false });
+  });
+
+  it('неудачная запись выбора темы показывает ошибку', async () => {
+    themeMode.changeThemeMode.mockRejectedValue(
+      new StorageError(StorageErrorCode.NotEnoughSpace, 'disk full'),
+    );
+    const tree = await renderScreen();
+
+    await press(tree, 'settings-theme-light');
+    await flush();
+
+    expect(exists(tree, TEST_IDS.themeSaveError)).toBe(true);
+  });
 });

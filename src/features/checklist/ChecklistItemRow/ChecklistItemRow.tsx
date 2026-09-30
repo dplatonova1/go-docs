@@ -1,6 +1,6 @@
 /**
  * Пункт сохранённого чек-листа: текст, статус «прикреплено / не
- * прикреплено», прикреплённые файлы с кнопкой открепления и кнопка
+ * прикреплено», прикреплённые файлы с кнопкой-иконкой открепления и кнопка
  * прикрепления.
  *
  * Элементы озвучиваются по отдельности, а не одной группой: внутри
@@ -14,6 +14,7 @@
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { IconButton } from '../../../components/IconButton';
 import { useTranslation } from '../../../i18n';
 import { isAttached, type AttachedDocument } from '../model';
 import { TEST_ID_PREFIX } from './constants';
@@ -75,7 +76,11 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   return (
     <Container testID={testID}>
       <Label
-        accessibilityLabel={t.checklistItem.labelA11y(number, total, item.label)}
+        accessibilityLabel={t.checklistItem.labelA11y(
+          number,
+          total,
+          item.label,
+        )}
         testID={`${testID}-label`}
       >
         {t.checklistItem.line(number, item.label)}
@@ -109,13 +114,12 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
               {name}
             </FileName>
 
-            <Button
-              variant="danger"
-              label={
-                isDetaching ? t.checklistItem.detaching : t.checklist.detach
-              }
-              // Вслух — что именно открепляется: «Открепить» без имени
-              // файла в списке из нескольких ничего не говорит.
+            <IconButton
+              icon="close"
+              color="danger"
+              busy={isDetaching}
+              // Вслух — что именно открепляется: иконка без имени файла в
+              // списке из нескольких ничего не говорит.
               accessibilityLabel={t.checklistItem.detachA11y(
                 name,
                 number,

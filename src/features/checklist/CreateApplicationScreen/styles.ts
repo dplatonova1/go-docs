@@ -8,7 +8,6 @@ import { FONTS, textSize } from '../../../theme/typography';
  */
 export const listContentStyle = toStyleSheet(css`
   gap: 12px;
-  padding-bottom: 24px;
 `);
 
 export const Header = styled.View`

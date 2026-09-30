@@ -21,3 +21,8 @@ export type ScreenProps = {
   edges?: readonly Edge[];
   testID?: string;
 };
+
+/** Пропсы оформления содержимого, см. `styles.ts`. */
+export type ContentStyleProps = {
+  $flushBottom: boolean;
+};

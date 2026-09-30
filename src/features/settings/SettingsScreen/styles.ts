@@ -46,7 +46,7 @@ export const Option = styled.Pressable<OptionStyleProps>`
   border-width: ${({ $selected }) =>
     $selected ? 2 : StyleSheet.hairlineWidth}px;
   border-color: ${({ theme, $selected }) =>
-    $selected ? theme.colors.primary : theme.colors.border};
+    $selected ? theme.colors.indicator : theme.colors.border};
   background-color: ${({ theme }) => theme.colors.surface};
 `;
 

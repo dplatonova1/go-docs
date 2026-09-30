@@ -15,7 +15,14 @@ import { memo, useCallback } from 'react';
 import { Button } from '../../../components/Button';
 import { useTranslation } from '../../../i18n';
 import { TEST_ID_PREFIX } from './constants';
-import { Actions, Card, OpenArea, Title, actionStyle, pressedStyle } from './styles';
+import {
+  Actions,
+  Card,
+  OpenArea,
+  Title,
+  actionStyle,
+  pressedStyle,
+} from './styles';
 import type { ApplicationRowProps } from './types';
 
 export const ApplicationRow = memo(function ApplicationRowImpl({

@@ -27,7 +27,7 @@ import type {
 } from '../../features/checklist/model';
 import { getApplicationById } from '../../features/checklist/repository';
 import { Centered, Message } from '../RootNavigator/styles';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 import { TEST_IDS } from './constants';
 
 type ApplicationState =
@@ -54,7 +54,7 @@ export function ApplicationGate({
   const theme = useTheme();
   // Типизированный хук: `popTo` есть у стека, а не у навигации вообще.
   const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   const [state, setState] = useState<ApplicationState>(LOADING);
   const [attempt, setAttempt] = useState(0);
 
@@ -106,7 +106,7 @@ export function ApplicationGate({
           <Centered>
             <ActivityIndicator
               size="large"
-              color={theme.colors.primary}
+              color={theme.colors.indicator}
               accessibilityLabel={t.applicationGate.loadingA11y}
             />
           </Centered>

@@ -34,11 +34,6 @@ export function TextField({
         $hasError={hasError}
         $multiline={rest.multiline === true}
         $minLines={minLines}
-        // Android рисует полю собственную нижнюю линию поверх нашей
-        // рамки — получается «двойная» граница, у которой снизу другой
-        // цвет. Убирается только прозрачным цветом; на iOS проп
-        // игнорируется.
-        underlineColorAndroid="transparent"
         // До `rest`, чтобы экран мог задать свой цвет плейсхолдера.
         placeholderTextColor={theme.colors.textSecondary}
         {...rest}

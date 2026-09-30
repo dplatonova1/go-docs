@@ -121,8 +121,7 @@ export function ChecklistScreen({
   const [state, setState] = useState<ItemsState>(LOADING);
   const [attempt, setAttempt] = useState(0);
   const [resetState, setResetState] = useState<ResetState>(RESET_IDLE);
-  const [packageState, setPackageState] =
-    useState<PackageState>(PACKAGE_IDLE);
+  const [packageState, setPackageState] = useState<PackageState>(PACKAGE_IDLE);
   // Сборка идёт долго, и второе нажатие успевает раньше, чем доедет
   // состояние: два пакета разом писали бы в один и тот же файл.
   const buildingRef = useRef(false);
@@ -390,8 +389,7 @@ export function ChecklistScreen({
   const isResetting = resetState.status === 'working';
   const isAttaching = attachState.status === 'working';
   const isDetaching = detachState.status === 'working';
-  const isBusy =
-    isAttaching || isDetaching || isResetting || isBuildingPackage;
+  const isBusy = isAttaching || isDetaching || isResetting || isBuildingPackage;
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<ChecklistItem>) => (
@@ -489,9 +487,7 @@ export function ChecklistScreen({
           ) : null}
 
           <Button
-            label={
-              isBuildingPackage ? t.checklist.building : t.checklist.build
-            }
+            label={isBuildingPackage ? t.checklist.building : t.checklist.build}
             accessibilityLabel={t.checklist.buildA11y}
             testID={TEST_IDS.packageButton}
             disabled={isBusy}
@@ -557,7 +553,7 @@ export function ChecklistScreen({
       {state.status === 'loading' ? (
         <ActivityIndicator
           size="large"
-          color={theme.colors.primary}
+          color={theme.colors.indicator}
           accessibilityLabel={t.checklist.loadingA11y}
           testID={TEST_IDS.loading}
         />

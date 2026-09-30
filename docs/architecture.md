@@ -22,7 +22,7 @@
 ```mermaid
 graph TD
     UI["UI-слой<br/>src/components + src/features"]
-    NAV["Навигация<br/>src/navigation<br/>React Navigation (native-stack)"]
+    NAV["Навигация<br/>src/navigation<br/>React Navigation (вкладки + native-stack)"]
     I18N["Переводы<br/>src/i18n<br/>ru / en, словари в бандле"]
 
     NAV --> UI

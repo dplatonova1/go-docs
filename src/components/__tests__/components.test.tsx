@@ -11,11 +11,15 @@
  */
 
 import React from 'react';
+import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
+import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppThemeProvider } from '../../theme/ThemeProvider';
 import { Button } from '../Button';
+import { IconButton } from '../IconButton';
+import { PlusButton } from '../PlusButton';
 import { ALL_EDGES, Screen } from '../Screen';
 import { TextField } from '../TextField';
 
@@ -102,9 +106,7 @@ describe('TextField', () => {
       />,
     );
 
-    expect(propsOf(tree, 'passport').accessibilityLabel).toBe(
-      'Номер паспорта',
-    );
+    expect(propsOf(tree, 'passport').accessibilityLabel).toBe('Номер паспорта');
   });
 
   it('без ошибки блок ошибки не рендерится', () => {
@@ -114,18 +116,6 @@ describe('TextField', () => {
 
     expect(tree.root.findAllByProps({ testID: 'passport-error' })).toHaveLength(
       0,
-    );
-  });
-
-  it('нативная подчёркивающая линия Android отключена', () => {
-    // Иначе поверх рамки поля Android рисует свою нижнюю линию — на iOS
-    // этого не видно, и регрессия прошла бы незамеченной.
-    const tree = render(
-      <TextField label="Номер" accessibilityLabel="Номер" testID="passport" />,
-    );
-
-    expect(resolvedProp(tree, 'passport', 'underlineColorAndroid')).toBe(
-      'transparent',
     );
   });
 
@@ -145,6 +135,63 @@ describe('TextField', () => {
   });
 });
 
+describe('IconButton', () => {
+  function renderIconButton(busy: boolean) {
+    return render(
+      <IconButton
+        icon="close"
+        color="danger"
+        accessibilityLabel="Открепить файл скан.pdf"
+        testID="detach"
+        busy={busy}
+      />,
+    );
+  }
+
+  function button(tree: ReactTestRenderer.ReactTestRenderer) {
+    return tree.root.findAll(
+      node => node.props.testID === 'detach' && node.props.accessibilityRole,
+    )[0]!;
+  }
+
+  it('озвучивается подписью — видимой надписи нет', () => {
+    const tree = renderIconButton(false);
+
+    expect(button(tree).props.accessibilityLabel).toBe(
+      'Открепить файл скан.pdf',
+    );
+    expect(tree.root.findAllByType(ActivityIndicator)).toHaveLength(0);
+  });
+
+  it('во время работы — спиннер, «занято» и недоступна', () => {
+    const tree = renderIconButton(true);
+
+    expect(tree.root.findAllByType(ActivityIndicator)).toHaveLength(1);
+    expect(button(tree).props.accessibilityState).toEqual({
+      disabled: true,
+      busy: true,
+    });
+  });
+});
+
+describe('PlusButton', () => {
+  it('без видимой надписи озвучивается подписью и сообщает о недоступности', () => {
+    const tree = render(
+      <PlusButton
+        accessibilityLabel="Создать новую заявку"
+        testID="add"
+        disabled
+      />,
+    );
+
+    const button = tree.root.findAll(
+      node => node.props.testID === 'add' && node.props.accessibilityRole,
+    )[0]!;
+    expect(button.props.accessibilityLabel).toBe('Создать новую заявку');
+    expect(button.props.accessibilityState).toEqual({ disabled: true });
+  });
+});
+
 describe('Screen', () => {
   it('рендерит вложенное содержимое', () => {
     const tree = render(
@@ -153,9 +200,9 @@ describe('Screen', () => {
       </Screen>,
     );
 
-    expect(tree.root.findAllByProps({ testID: 'inner' }).length).toBeGreaterThan(
-      0,
-    );
+    expect(
+      tree.root.findAllByProps({ testID: 'inner' }).length,
+    ).toBeGreaterThan(0);
   });
 
   it('по умолчанию не учитывает верхнюю безопасную зону', () => {
@@ -163,7 +210,27 @@ describe('Screen', () => {
     // шапкой (ADR-0014).
     const tree = render(<Screen testID="screen">{null}</Screen>);
 
-    expect(resolvedProp(tree, 'screen', 'edges')).toEqual(['bottom', 'left', 'right']);
+    expect(resolvedProp(tree, 'screen', 'edges')).toEqual([
+      'bottom',
+      'left',
+      'right',
+    ]);
+  });
+
+  it.each([
+    ['над панелью вкладок содержимое доходит до неё без отступа', 60, 0],
+    ['вне вкладок отступ снизу остаётся', undefined, 16],
+  ] as const)('%s', (_name, tabBarHeight, paddingBottom) => {
+    const tree = render(
+      <BottomTabBarHeightContext.Provider value={tabBarHeight}>
+        <Screen testID="screen">{null}</Screen>
+      </BottomTabBarHeightContext.Provider>,
+    );
+
+    const content = StyleSheet.flatten(
+      tree.root.findByType(ScrollView).props.contentContainerStyle,
+    );
+    expect(content.paddingBottom).toBe(paddingBottom);
   });
 
   it('экран вне навигации может запросить все зоны', () => {

@@ -10,10 +10,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
 
 import { DocumentLibraryScreen } from '../../features/library/DocumentLibraryScreen';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 
 type Props = NativeStackScreenProps<
-  RootStackParamList,
+  HomeStackParamList,
   'PickDocumentFromLibrary'
 >;
 

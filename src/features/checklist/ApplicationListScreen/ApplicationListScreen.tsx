@@ -9,10 +9,6 @@
  * Удаление необратимо, поэтому сначала диалог с числами: сколько пунктов
  * чек-листа пропадёт и сколько документов останется в библиотеке
  * ([ADR-0016](../../../../docs/adr/0016-application-deletion-keeps-documents.md)).
- *
- * Отсюда же открываются библиотека документов и настройки: и то и
- * другое общее для всех заявок, и заходить туда через конкретную заявку
- * было бы странно.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -25,6 +21,7 @@ import {
 import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../../components/Button';
+import { PlusButton } from '../../../components/PlusButton';
 import { Screen } from '../../../components/Screen';
 import { useTranslation } from '../../../i18n';
 import { ApplicationRow } from '../ApplicationRow';
@@ -37,7 +34,13 @@ import {
   listApplications,
 } from '../repository';
 import { DELETE_IDLE, LOADING, TEST_IDS } from './constants';
-import { ErrorText, Footer, Hint, listContentStyle } from './styles';
+import {
+  CreateButtonSlot,
+  ErrorText,
+  Footer,
+  Hint,
+  listContentStyle,
+} from './styles';
 import type {
   ApplicationListScreenProps,
   DeleteState,
@@ -49,8 +52,6 @@ export function ApplicationListScreen({
   onOpen,
   onRename,
   onCreate,
-  onOpenLibrary,
-  onOpenSettings,
 }: ApplicationListScreenProps) {
   const t = useTranslation();
   const theme = useTheme();
@@ -190,32 +191,6 @@ export function ApplicationListScreen({
           {deleteState.message}
         </ErrorText>
       ) : null}
-
-      <Button
-        label={t.applicationList.create}
-        accessibilityLabel={t.applicationList.createA11y}
-        testID={TEST_IDS.createButton}
-        disabled={isDeleting}
-        onPress={onCreate}
-      />
-
-      <Button
-        variant="secondary"
-        label={t.applicationList.library}
-        accessibilityLabel={t.applicationList.libraryA11y}
-        testID={TEST_IDS.libraryButton}
-        disabled={isDeleting}
-        onPress={onOpenLibrary}
-      />
-
-      <Button
-        variant="secondary"
-        label={t.applicationList.settings}
-        accessibilityLabel={t.applicationList.settingsA11y}
-        testID={TEST_IDS.settingsButton}
-        disabled={isDeleting}
-        onPress={onOpenSettings}
-      />
     </Footer>
   );
 
@@ -233,6 +208,17 @@ export function ApplicationListScreen({
           ListFooterComponent={footer}
           contentContainerStyle={listContentStyle}
         />
+
+        {/* По центру снизу, вне списка: создание — главное действие
+            экрана, и до него не нужно докручивать список. */}
+        <CreateButtonSlot>
+          <PlusButton
+            accessibilityLabel={t.applicationList.createA11y}
+            testID={TEST_IDS.createButton}
+            disabled={isDeleting}
+            onPress={onCreate}
+          />
+        </CreateButtonSlot>
       </Screen>
     );
   }
@@ -242,7 +228,7 @@ export function ApplicationListScreen({
       {state.status === 'loading' ? (
         <ActivityIndicator
           size="large"
-          color={theme.colors.primary}
+          color={theme.colors.indicator}
           accessibilityLabel={t.applicationList.loadingA11y}
           testID={TEST_IDS.loading}
         />

@@ -48,9 +48,9 @@ export const StatusText = styled.Text<StatusStyleProps>`
  * Имя файла и кнопка удаления в одну строку. При крупном системном шрифте
  * кнопка переносится под имя, а не сжимает его до многоточия.
  */
+/** Имя файла сжимается многоточием, кнопка-иконка всегда справа. */
 export const FileRow = styled.View`
   flex-direction: row;
-  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 `;

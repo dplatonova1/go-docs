@@ -274,9 +274,7 @@ export function CreateApplicationScreen({
         {t.createApplication.sectionTitle(items.length)}
       </SectionTitle>
 
-      {items.length === 0 ? (
-        <Hint>{t.createApplication.hint}</Hint>
-      ) : null}
+      {items.length === 0 ? <Hint>{t.createApplication.hint}</Hint> : null}
     </Header>
   );
 

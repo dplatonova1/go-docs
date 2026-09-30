@@ -64,8 +64,6 @@ type Handlers = {
   onOpen?: jest.Mock;
   onRename?: jest.Mock;
   onCreate?: jest.Mock;
-  onOpenLibrary?: jest.Mock;
-  onOpenSettings?: jest.Mock;
   isFocused?: boolean;
 };
 
@@ -73,8 +71,6 @@ async function renderScreen({
   onOpen = jest.fn(),
   onRename = jest.fn(),
   onCreate = jest.fn(),
-  onOpenLibrary = jest.fn(),
-  onOpenSettings = jest.fn(),
   isFocused = true,
 }: Handlers = {}) {
   const tree = await render(
@@ -83,8 +79,6 @@ async function renderScreen({
       onOpen={onOpen}
       onRename={onRename}
       onCreate={onCreate}
-      onOpenLibrary={onOpenLibrary}
-      onOpenSettings={onOpenSettings}
     />,
   );
   await flush();
@@ -93,8 +87,6 @@ async function renderScreen({
     onOpen,
     onRename,
     onCreate,
-    onOpenLibrary,
-    onOpenSettings,
   };
 }
 
@@ -188,15 +180,6 @@ describe('выбор заявки', () => {
     await press(tree, 'create-application-button');
 
     expect(onCreate).toHaveBeenCalledTimes(1);
-  });
-
-  it('библиотека документов открывается отсюда — она общая для заявок', async () => {
-    repository.listApplications.mockResolvedValue(APPLICATIONS);
-
-    const { tree, onOpenLibrary } = await renderScreen();
-    await press(tree, 'open-document-library-button');
-
-    expect(onOpenLibrary).toHaveBeenCalledTimes(1);
   });
 });
 

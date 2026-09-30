@@ -16,10 +16,7 @@
  */
 
 import type { AttachmentErrorCode } from '../../features/checklist/errors';
-import type {
-  QualityFlag,
-  RegistryStatus,
-} from '../../features/package/types';
+import type { QualityFlag, RegistryStatus } from '../../features/package/types';
 import type { StorageErrorCode } from '../../storage/errors';
 
 export const ru = {
@@ -32,6 +29,13 @@ export const ru = {
     saving: 'Сохранение…',
   },
 
+  /** Нижняя панель вкладок. */
+  tabs: {
+    home: 'Главная',
+    library: 'Библиотека',
+    settings: 'Настройки',
+  },
+
   /** Заголовки в шапке навигации. Заголовок чек-листа — название заявки. */
   navigation: {
     applicationList: 'Заявки',
@@ -40,6 +44,8 @@ export const ru = {
     documentLibrary: 'Библиотека документов',
     pickDocument: 'Выбор файла',
     settings: 'Настройки',
+    /** Кнопка «назад» в шапке: видна только иконка, это — для скринридера. */
+    backA11y: 'Назад',
   },
 
   /** Экран запуска: навигации на нём ещё нет. */
@@ -72,12 +78,7 @@ export const ru = {
       'документов с сайта ведомства.',
     loadingA11y: 'Загрузка списка заявок',
     retryA11y: 'Повторить загрузку списка заявок',
-    create: 'Создать заявку',
     createA11y: 'Создать новую заявку',
-    library: 'Библиотека документов',
-    libraryA11y: 'Открыть библиотеку загруженных документов',
-    settings: 'Настройки',
-    settingsA11y: 'Открыть настройки приложения',
   },
 
   applicationRow: {
@@ -136,9 +137,9 @@ export const ru = {
     line: (number: number, label: string) => `${number}. ${label}`,
     labelA11y: (number: number, total: number, label: string) =>
       `Пункт ${number} из ${total}: ${label}`,
-    statusA11y: (number: number, status: string) => `Пункт ${number}: ${status}`,
+    statusA11y: (number: number, status: string) =>
+      `Пункт ${number}: ${status}`,
     fileA11y: (name: string) => `Прикреплённый файл: ${name}`,
-    detaching: 'Открепление…',
     detachA11y: (name: string, number: number, label: string) =>
       `Открепить файл ${name} от пункта ${number}: ${label}`,
     attach: 'Прикрепить файл',
@@ -241,7 +242,8 @@ export const ru = {
     attaching: 'Прикрепление…',
     attached: 'Уже прикреплён',
     attachA11y: (name: string) => `Прикрепить файл ${name} к пункту чек-листа`,
-    attachedA11y: (name: string) => `Файл ${name} уже прикреплён к этому пункту`,
+    attachedA11y: (name: string) =>
+      `Файл ${name} уже прикреплён к этому пункту`,
     deleteFromLibrary: 'Удалить из библиотеки',
     // Вслух — что именно удаляется и откуда: рядом в чек-листе есть
     // похожее по звучанию «Открепить», а последствия разные.
@@ -258,6 +260,19 @@ export const ru = {
     selectedA11y: (name: string) => `Язык приложения: ${name}. Уже выбран`,
     selected: 'Выбран',
     announceChanged: 'Язык приложения изменён',
+    themeTitle: 'Тема',
+    themeHint:
+      'Оформление приложения. «Как в системе» следует настройке устройства.',
+    themeNames: {
+      system: 'Как в системе',
+      light: 'Светлая',
+      dark: 'Тёмная',
+    },
+    themeA11y: (name: string) => `Тема оформления: ${name}`,
+    themeSelectedA11y: (name: string) =>
+      `Тема оформления: ${name}. Уже выбрана`,
+    themeSelected: 'Выбрана',
+    announceThemeChanged: 'Тема оформления изменена',
   },
 
   /**
@@ -322,7 +337,10 @@ export const ru = {
         'На устройстве не хватает свободного места. Освободите место и попробуйте снова.',
       'database-failure':
         'Не удалось обратиться к данным на устройстве. Попробуйте ещё раз.',
-    } satisfies Record<StorageErrorCode, string | ((megabytes: number) => string)>,
+    } satisfies Record<
+      StorageErrorCode,
+      string | ((megabytes: number) => string)
+    >,
 
     attachment: {
       'picker-failed': 'Не удалось открыть выбор файла. Попробуйте ещё раз.',

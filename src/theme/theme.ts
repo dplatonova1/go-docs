@@ -1,9 +1,9 @@
 /**
  * Тема для styled-components.
  *
- * Палитры и требования к контрасту — в `colors.ts`; здесь только упаковка
- * их в объект, который styled-components передаёт каждому стилю как
- * `props.theme`. Тип подключён к styled-components в `styled.d.ts`.
+ * Палитры и требования к контрасту — в `colors.ts`; здесь только
+ * упаковка их в объект, который styled-components передаёт каждому стилю
+ * как `props.theme`. Тип подключён к styled-components в `styled.d.ts`.
  */
 
 import { darkColors, lightColors, type ThemeColors } from './colors';

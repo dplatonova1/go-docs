@@ -1,5 +1,5 @@
 /**
- * Логика запуска: выбранный язык → миграции → последняя открытая заявка
+ * Логика запуска: выбранные язык и тема → миграции → последняя открытая заявка
  * → стартовый стек навигации.
  *
  * Миграции здесь, а не в отдельном «бутстрапе»: до их применения читать
@@ -18,6 +18,7 @@ import { runMigrations } from '../../db/client';
 import { describeError } from '../../features/checklist/errorMessages';
 import { getLastOpenedApplication } from '../../features/checklist/repository';
 import { loadStoredLocale } from '../../i18n/persistence';
+import { loadStoredThemeMode } from '../../theme/themeMode';
 import { LOADING } from './constants';
 import { initialNavigationState } from './initialNavigationState';
 import type { BootstrapState } from './types';
@@ -30,7 +31,9 @@ export function useBootstrap() {
     let cancelled = false;
 
     async function bootstrap(): Promise<BootstrapState> {
-      await loadStoredLocale();
+      // Оба чтения не бросают: испорченный файл настроек читается как
+      // «выбора нет» (`storage/settings.ts`).
+      await Promise.all([loadStoredLocale(), loadStoredThemeMode()]);
 
       try {
         await runMigrations();

@@ -8,9 +8,9 @@ import { DISABLED_OPACITY, PRESSED_OPACITY, VARIANT_COLORS } from './constants';
 import type { ContainerStyleProps, LabelStyleProps } from './types';
 
 /**
- * У `primary` и `danger` рамки нет: границу обозначает заливка, а
- * назначение — надпись, контрастная к заливке не меньше 7:1. У
- * `secondary` заливка сливается с экраном, и границу рисует рамка.
+ * У `primary` рамки нет: границу обозначает заливка, а назначение —
+ * надпись, контрастная к заливке не меньше 7:1. У `secondary` и `danger`
+ * контур рисует рамка.
  */
 export const Container = styled.Pressable<ContainerStyleProps>`
   min-height: ${MIN_TOUCH_TARGET}px;

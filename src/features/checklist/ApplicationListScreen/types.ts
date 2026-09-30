@@ -14,10 +14,6 @@ export type ApplicationListScreenProps = {
   onOpen: (application: Application) => void;
   onRename: (application: Application) => void;
   onCreate: () => void;
-  /** Открыть библиотеку документов — она одна на все заявки. */
-  onOpenLibrary: () => void;
-  /** Открыть настройки — язык приложения и всё, что появится после. */
-  onOpenSettings: () => void;
 };
 
 export type ListState =

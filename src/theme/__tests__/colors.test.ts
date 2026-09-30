@@ -47,17 +47,26 @@ describe.each<[string, ThemeColors]>([
       },
     );
 
-    it('рамки полей различимы с контрастом не меньше 3:1', () => {
-      expect(contrast(colors.border, colors[ground])).toBeGreaterThanOrEqual(
-        3,
+    it('indicator (подпись активной вкладки) читается с контрастом не меньше 7:1', () => {
+      expect(contrast(colors.indicator, colors[ground])).toBeGreaterThanOrEqual(
+        7,
       );
+    });
+
+    it('рамки полей различимы с контрастом не меньше 3:1', () => {
+      expect(contrast(colors.border, colors[ground])).toBeGreaterThanOrEqual(3);
     });
   });
 
-  it.each([
-    ['onPrimary', 'primary'],
-    ['onDanger', 'dangerSurface'],
-  ] as const)('%s читается на %s с контрастом не меньше 7:1', (text, fill) => {
-    expect(contrast(colors[text], colors[fill])).toBeGreaterThanOrEqual(7);
+  it('надпись вторичной кнопки читается на её заливке с контрастом не меньше 7:1', () => {
+    expect(
+      contrast(colors.text, colors.secondarySurface),
+    ).toBeGreaterThanOrEqual(7);
+  });
+
+  it('onPrimary читается на primary с контрастом не меньше 7:1', () => {
+    expect(contrast(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(
+      7,
+    );
   });
 });

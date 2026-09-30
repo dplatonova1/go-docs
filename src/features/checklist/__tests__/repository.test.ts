@@ -547,9 +547,9 @@ describe('detachDocumentFromItem', () => {
     const statements = tx.execute.mock.calls.map(([sql]) => sql);
     // Ни удаления документа, ни чтения пути к файлу: открепление — это
     // только связь (ADR-0010, ADR-0013 «Обновление»).
-    expect(statements.some(sql => sql.startsWith('DELETE FROM documents'))).toBe(
-      false,
-    );
+    expect(
+      statements.some(sql => sql.startsWith('DELETE FROM documents')),
+    ).toBe(false);
     expect(statements.some(sql => sql.includes('file_path'))).toBe(false);
   });
 

@@ -11,10 +11,7 @@ import React from 'react';
 import { AccessibilityInfo, Alert, type AlertButton } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 
-import {
-  StorageError,
-  StorageErrorCode,
-} from '../../../storage/errors';
+import { StorageError, StorageErrorCode } from '../../../storage/errors';
 import {
   cleanup,
   exists,

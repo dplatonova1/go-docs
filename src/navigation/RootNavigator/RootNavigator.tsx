@@ -1,6 +1,8 @@
 /**
- * Корень навигации: стек из списка заявок, чек-листа и создания заявки
- * ([ADR-0014](../../../docs/adr/0014-react-navigation-native-stack.md)).
+ * Корень навигации: нижняя панель вкладок «Главная», «Библиотека»,
+ * «Настройки», у каждой свой стек
+ * ([ADR-0014](../../../docs/adr/0014-react-navigation-native-stack.md),
+ * [ADR-0022](../../../docs/adr/0022-bottom-tabs.md)).
  *
  * До того как навигация построена, показывается загрузка или отказ
  * хранилища: без миграций читать заявки нельзя, а без заявок неизвестно,
@@ -10,8 +12,11 @@
  * приложение с данными, быть не должно (см. [`../README.md`](../README.md)).
  */
 
+import {
+  createBottomTabNavigator,
+  type BottomTabBarProps,
+} from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useMemo } from 'react';
 import { ActivityIndicator, useColorScheme } from 'react-native';
 import { useTheme } from 'styled-components/native';
@@ -19,22 +24,27 @@ import { useTheme } from 'styled-components/native';
 import { Button } from '../../components/Button';
 import { ALL_EDGES, Screen } from '../../components/Screen';
 import { useTranslation } from '../../i18n';
-import {
-  ApplicationListRoute,
-  ChecklistRoute,
-  CreateApplicationRoute,
-  DocumentLibraryRoute,
-  PickDocumentFromLibraryRoute,
-  RenameApplicationRoute,
-  SettingsRoute,
-} from '../routes';
+import { TabBar } from '../TabBar';
 import { TEST_IDS } from './constants';
 import { toNavigationTheme } from './navigationTheme';
+import {
+  HomeStackNavigator,
+  LibraryStackNavigator,
+  SettingsStackNavigator,
+} from './stacks';
 import { Centered, Message, Title } from './styles';
 import { useBootstrap } from './useBootstrap';
-import type { RootStackParamList } from './types';
+import type { RootTabParamList } from './types';
 
-const Stack = createNativeStackNavigator<RootStackParamList>();
+const Tab = createBottomTabNavigator<RootTabParamList>();
+
+/**
+ * Панель вкладок — своя, см. `TabBar`. Функция модуля, а не стрелка в
+ * JSX: иначе на каждый рендер навигатор получал бы новый компонент.
+ */
+function renderTabBar(props: BottomTabBarProps) {
+  return <TabBar {...props} />;
+}
 
 export function RootNavigator() {
   const t = useTranslation();
@@ -52,15 +62,11 @@ export function RootNavigator() {
       return (
         // Экраны до `NavigationContainer`: шапки над ними нет, вырез
         // они обходят сами.
-        <Screen
-          scrollable={false}
-          edges={ALL_EDGES}
-          testID={TEST_IDS.loading}
-        >
+        <Screen scrollable={false} edges={ALL_EDGES} testID={TEST_IDS.loading}>
           <Centered>
             <ActivityIndicator
               size="large"
-              color={theme.colors.primary}
+              color={theme.colors.indicator}
               accessibilityLabel={t.bootstrap.loadingA11y}
             />
           </Centered>
@@ -89,46 +95,29 @@ export function RootNavigator() {
           theme={navigationTheme}
           initialState={state.initialState}
         >
-          <Stack.Navigator>
-            <Stack.Screen
-              name="ApplicationList"
-              component={ApplicationListRoute}
-              options={{ title: t.navigation.applicationList }}
+          {/* «Назад» с корня любой вкладки ведёт на «Главную», а уже
+              оттуда — из приложения. */}
+          <Tab.Navigator
+            tabBar={renderTabBar}
+            backBehavior="firstRoute"
+            screenOptions={{ headerShown: false }}
+          >
+            <Tab.Screen
+              name="HomeTab"
+              component={HomeStackNavigator}
+              options={{ title: t.tabs.home }}
             />
-            {/* Заголовок — название заявки, его ставит сам маршрут после
-                загрузки. */}
-            <Stack.Screen name="Checklist" component={ChecklistRoute} />
-            <Stack.Screen
-              name="CreateApplication"
-              component={CreateApplicationRoute}
-              options={{ title: t.navigation.createApplication }}
+            <Tab.Screen
+              name="LibraryTab"
+              component={LibraryStackNavigator}
+              options={{ title: t.tabs.library }}
             />
-            <Stack.Screen
-              name="DocumentLibrary"
-              component={DocumentLibraryRoute}
-              options={{ title: t.navigation.documentLibrary }}
+            <Tab.Screen
+              name="SettingsTab"
+              component={SettingsStackNavigator}
+              options={{ title: t.tabs.settings }}
             />
-            <Stack.Screen
-              name="PickDocumentFromLibrary"
-              component={PickDocumentFromLibraryRoute}
-              options={{ title: t.navigation.pickDocument }}
-            />
-            <Stack.Screen
-              name="Settings"
-              component={SettingsRoute}
-              options={{ title: t.navigation.settings }}
-            />
-            {/* Модально: переименование — короткий шаг поверх списка, из
-                которого возвращаются туда же. */}
-            <Stack.Screen
-              name="RenameApplication"
-              component={RenameApplicationRoute}
-              options={{
-                title: t.navigation.renameApplication,
-                presentation: 'modal',
-              }}
-            />
-          </Stack.Navigator>
+          </Tab.Navigator>
         </NavigationContainer>
       );
 

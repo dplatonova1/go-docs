@@ -35,6 +35,14 @@ export type ThemeColors = {
   /** Текст на `primary`. */
   readonly onPrimary: string;
   /**
+   * Акцент без заливки: активная вкладка (иконка и подпись), спиннеры,
+   * рамка выбранного варианта. Оттенок `primary`, но контрастный к фону:
+   * заливку кнопки видно по надписи на ней, а эти элементы — только по
+   * их собственному цвету. Раз им красится подпись, держит 7:1, как
+   * текст.
+   */
+  readonly indicator: string;
+  /**
    * Рамки полей ввода и кнопок-контуров — там, где рамка показывает
    * границу элемента. Не меньше 3:1 к фону.
    */
@@ -45,15 +53,19 @@ export type ThemeColors = {
    * управления, для этого `border`.
    */
   readonly divider: string;
+  /** Заливка вторичной кнопки. */
+  readonly secondarySurface: string;
+  /**
+   * Рамка вторичной кнопки. В тёмной теме она намеренно мягче `border`
+   * и не держит 3:1: кнопку опознают по надписи (7:1), а рамка лишь
+   * очерчивает заливку. Рамки полей ввода — по-прежнему `border`.
+   */
+  readonly secondaryBorder: string;
   /**
    * Текст ошибок. Цвет — не единственный признак ошибки: рядом всегда
    * есть текст, иначе её не различат люди с нарушением цветовосприятия.
    */
   readonly danger: string;
-  /** Фон кнопки необратимого действия (удаление). */
-  readonly dangerSurface: string;
-  /** Текст на `dangerSurface`. */
-  readonly onDanger: string;
 };
 
 export const lightColors: ThemeColors = {
@@ -67,13 +79,15 @@ export const lightColors: ThemeColors = {
   textSecondary: '#525252',
   primary: '#96b3ff',
   onPrimary: '#1E2723',
+  // Тёмный оттенок `primary` (#96b3ff даёт 2:1 к фону): 8.2:1.
+  indicator: '#2645A8',
   // В теме #DFDFDF — 1.3:1. Исходный цвет остался в `divider`.
   border: '#929292',
   divider: '#DFDFDF',
-  // В теме #CA3214 — 5.2:1 как текст и 5.2:1 под белой надписью.
+  secondarySurface: '#FCFCFC',
+  secondaryBorder: '#929292',
+  // В теме #CA3214 — 5.2:1 как текст.
   danger: '#A42910',
-  dangerSurface: '#A42910',
-  onDanger: '#FFFCFC',
 };
 
 export const darkColors: ThemeColors = {
@@ -82,17 +96,22 @@ export const darkColors: ThemeColors = {
   surface: '#171717',
   text: '#E2E8F0',
   textSecondary: '#A2A2A2',
-  primary: '#153da2',
+  // Фталоцианиновый зелёный (решено 2026-09-29, прежде #153da2).
+  primary: '#123524',
   // В теме #DDE8E3 — 6.0:1.
   onPrimary: '#FFFFFF',
+  // Светлый оттенок фталоцианинового зелёного: 7.3:1 к `surface`.
+  indicator: '#4DB887',
   // В теме #292929 — 1.3:1. Исходный цвет остался в `divider`.
   border: '#646464',
   divider: '#292929',
-  // В теме текстового красного нет: `destructive` (#541C15) — фон кнопки,
-  // как текст он даёт 1.4:1. Оттенок взят из светлой темы.
+  // Фон светлее `surface`, рамка темнее `border` — чтобы рамка не спорила
+  // с заливкой (решено 2026-09-29).
+  secondarySurface: '#242424',
+  secondaryBorder: '#383838',
+  // В теме текстового красного нет: `destructive` (#541C15) как текст
+  // даёт 1.4:1. Оттенок взят из светлой темы.
   danger: '#F1836D',
-  dangerSurface: '#541C15',
-  onDanger: '#EDE9E8',
 };
 
 /**

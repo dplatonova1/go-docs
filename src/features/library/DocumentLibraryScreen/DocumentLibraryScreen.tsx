@@ -272,7 +272,7 @@ export function DocumentLibraryScreen({
       {state.status === 'loading' ? (
         <ActivityIndicator
           size="large"
-          color={theme.colors.primary}
+          color={theme.colors.indicator}
           accessibilityLabel={t.library.loadingA11y}
           testID={TEST_IDS.loading}
         />

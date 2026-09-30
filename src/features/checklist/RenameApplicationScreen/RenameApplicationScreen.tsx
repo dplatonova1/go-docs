@@ -83,9 +83,7 @@ export function RenameApplicationScreen({
         autoFocus
         returnKeyType="done"
         onSubmitEditing={handleSave}
-        error={
-          showTitleError ? t.renameApplication.titleRequired : undefined
-        }
+        error={showTitleError ? t.renameApplication.titleRequired : undefined}
       />
 
       {saveState.status === 'failed' ? (

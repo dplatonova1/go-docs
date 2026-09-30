@@ -85,7 +85,11 @@ it('несколько документов одного пункта собир
   client.getDb.mockResolvedValue(
     fakeDb([
       row(),
-      row({ document_id: 'd2', original_filename: 'Скан.jpg', mime_type: 'image/jpeg' }),
+      row({
+        document_id: 'd2',
+        original_filename: 'Скан.jpg',
+        mime_type: 'image/jpeg',
+      }),
     ]),
   );
 

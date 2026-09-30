@@ -11,10 +11,10 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useCallback } from 'react';
 
 import { RenameApplicationScreen } from '../../features/checklist/RenameApplicationScreen';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 import { ApplicationGate } from './ApplicationGate';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'RenameApplication'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'RenameApplication'>;
 
 export function RenameApplicationRoute({ route, navigation }: Props) {
   const { applicationId } = route.params;

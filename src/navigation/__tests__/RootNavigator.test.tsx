@@ -2,8 +2,9 @@
  * Запуск приложения и переходы между экранами.
  *
  * Хранилище замокано на нашей границе (`db/client` и репозиторий), а
- * навигация — настоящая: проверяется в том числе то, что делает стек —
- * возврат к списку и замена экрана создания на чек-лист.
+ * навигация — настоящая: проверяется в том числе то, что делают стек и
+ * вкладки — возврат к списку, замена экрана создания на чек-лист,
+ * сохранение стека вкладки при переходе на другую.
  *
  * Экраны стека остаются смонтированными под верхним, поэтому «список
  * заявок есть в дереве» само по себе ничего не значит — проверяется
@@ -37,6 +38,15 @@ jest.mock('react-native-safe-area-context', () => {
 jest.mock('../../i18n/persistence', () => ({
   loadStoredLocale: jest.fn().mockResolvedValue(undefined),
   changeLocale: jest.fn().mockResolvedValue(undefined),
+}));
+
+// Выбор темы лежит в том же файле настроек и применяется нативным
+// `Appearance`; его проверяет `theme/__tests__/themeMode.test.ts`.
+jest.mock('../../theme/themeMode', () => ({
+  loadStoredThemeMode: jest.fn().mockResolvedValue(undefined),
+  THEME_MODES: ['system', 'light', 'dark'],
+  getThemeMode: () => 'system',
+  changeThemeMode: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock('../../db/client', () => ({
@@ -232,23 +242,41 @@ it('из списка открывается переименование зая
   expect(repository.getApplicationById).toHaveBeenCalledWith('app-1');
 });
 
-it('из списка открывается библиотека документов', async () => {
+it('панель вкладок видна поверх работы с заявкой', async () => {
   repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
-  repository.listApplications.mockResolvedValue([APPLICATION]);
   const tree = await renderNavigator();
 
-  // Список под чек-листом данные не грузит, пока не получит фокус, —
-  // поэтому сначала возвращаемся на него.
-  await ReactTestRenderer.act(async () => {
-    tree.root.findByType(ChecklistScreen).props.onReset();
-  });
-  await flush();
+  expect(exists(tree, 'checklist-screen')).toBe(true);
+  expect(exists(tree, 'tab-home')).toBe(true);
+  expect(exists(tree, 'tab-library')).toBe(true);
+  expect(exists(tree, 'tab-settings')).toBe(true);
+});
 
-  await press(tree, 'open-document-library-button');
+it('вкладка «Библиотека» открывает всю библиотеку, а «Главная» помнит чек-лист', async () => {
+  repository.getLastOpenedApplication.mockResolvedValue(APPLICATION);
+  const tree = await renderNavigator();
+
+  await press(tree, 'tab-library');
   await flush();
 
   expect(exists(tree, 'document-library-screen')).toBe(true);
+  // Библиотека целиком, а не выбор файла для пункта.
   expect(repository.listLibraryDocuments).toHaveBeenCalledWith(null);
+
+  await press(tree, 'tab-home');
+  await flush();
+
+  // У вкладки свой стек: открытый чек-лист не потерялся.
+  expect(exists(tree, 'checklist-screen')).toBe(true);
+});
+
+it('вкладка «Настройки» открывает настройки', async () => {
+  const tree = await renderNavigator();
+
+  await press(tree, 'tab-settings');
+  await flush();
+
+  expect(exists(tree, 'settings-screen')).toBe(true);
 });
 
 it('из пункта чек-листа открывается выбор файла из библиотеки', async () => {

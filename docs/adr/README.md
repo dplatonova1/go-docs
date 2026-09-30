@@ -20,7 +20,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0011](./0011-styled-components.md) | Стили компонентов — styled-components, тема через `ThemeProvider` | Accepted |
 | [0012](./0012-delete-orphan-documents-with-application.md) | Удаление заявки удаляет документы, которые больше ни к чему не прикреплены (с подтверждением) | Частично заменён ADR-0016 |
 | [0013](./0013-detach-deletes-document-in-phase-1.md) | Открепление файла в Фазе 1 — полное удаление документа, а не снятие связи | Accepted; поведение снято 2026-09-20, см. «Обновление» в ADR |
-| [0014](./0014-react-navigation-native-stack.md) | Навигация — React Navigation (native-stack) | Accepted |
+| [0014](./0014-react-navigation-native-stack.md) | Навигация — React Navigation (native-stack) | Accepted; структура дополнена ADR-0022 |
 | [0015](./0015-multiple-applications-last-opened.md) | Несколько заявок; активная — последняя открытая | Accepted |
 | [0016](./0016-application-deletion-keeps-documents.md) | Удаление заявки не трогает документы (заменяет разделы 2-3 ADR-0012) | Accepted |
 | [0017](./0017-document-library-screen.md) | Экран библиотеки документов: переиспользование файлов и удаление с устройства | Accepted |
@@ -28,6 +28,7 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0019](./0019-pdf-package-assembly.md) | Сборка финального PDF-пакета: реестр, сжатие снимков, share sheet | Accepted |
 | [0020](./0020-package-file-types-limited-to-images-and-pdf.md) | В пакет попадают только JPEG, PNG и PDF; конвертация docx отвергнута | Accepted |
 | [0021](./0021-runtime-localization.md) | Переключение языка (ru/en): свой типизированный словарь, выбор в файле настроек | Accepted |
+| [0022](./0022-bottom-tabs.md) | Нижняя панель вкладок (у каждой свой стек), иконки на react-native-svg | Accepted |
 
 ## Когда заводить новый ADR
 

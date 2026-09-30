@@ -17,9 +17,9 @@ import { Alert } from 'react-native';
 import { CreateApplicationScreen } from '../../features/checklist/CreateApplicationScreen';
 import type { Application } from '../../features/checklist/model';
 import { translations } from '../../i18n';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'CreateApplication'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'CreateApplication'>;
 
 export function CreateApplicationRoute({ navigation }: Props) {
   const [isDirty, setDirty] = useState(false);

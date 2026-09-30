@@ -26,6 +26,12 @@ export const en: Messages = {
     saving: 'Saving…',
   },
 
+  tabs: {
+    home: 'Home',
+    library: 'Library',
+    settings: 'Settings',
+  },
+
   navigation: {
     applicationList: 'Applications',
     createApplication: 'New application',
@@ -33,6 +39,7 @@ export const en: Messages = {
     documentLibrary: 'Document library',
     pickDocument: 'Choose a file',
     settings: 'Settings',
+    backA11y: 'Back',
   },
 
   bootstrap: {
@@ -62,12 +69,7 @@ export const en: Messages = {
       'the list of documents from the authority website.',
     loadingA11y: 'Loading the list of applications',
     retryA11y: 'Try loading the list of applications again',
-    create: 'Create application',
     createA11y: 'Create a new application',
-    library: 'Document library',
-    libraryA11y: 'Open the library of uploaded documents',
-    settings: 'Settings',
-    settingsA11y: 'Open app settings',
   },
 
   applicationRow: {
@@ -115,7 +117,6 @@ export const en: Messages = {
       `Item ${number} of ${total}: ${label}`,
     statusA11y: (number: number, status: string) => `Item ${number}: ${status}`,
     fileA11y: (name: string) => `Attached file: ${name}`,
-    detaching: 'Detaching…',
     detachA11y: (name: string, number: number, label: string) =>
       `Detach the file ${name} from item ${number}: ${label}`,
     attach: 'Attach a file',
@@ -231,6 +232,18 @@ export const en: Messages = {
     selectedA11y: (name: string) => `App language: ${name}. Already selected`,
     selected: 'Selected',
     announceChanged: 'App language changed',
+    themeTitle: 'Theme',
+    themeHint: 'App appearance. “System” follows the device setting.',
+    themeNames: {
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+    },
+    themeA11y: (name: string) => `Appearance: ${name}`,
+    themeSelectedA11y: (name: string) =>
+      `Appearance: ${name}. Already selected`,
+    themeSelected: 'Selected',
+    announceThemeChanged: 'Appearance changed',
   },
 
   date: {

@@ -1,7 +1,7 @@
 /**
- * Настройки приложения. Пока в них один раздел — язык.
+ * Настройки приложения: язык и тема оформления.
  *
- * Язык меняется сразу по нажатию, без кнопки «Сохранить»: выбор виден
+ * Язык и тема меняются сразу по нажатию, без кнопки «Сохранить»: выбор виден
  * тут же, весь экран перерисовывается на новом языке, и подтверждать
  * нечего. Запись в файл идёт следом, и только её неудача даёт сообщение
  * об ошибке — переключённый язык при этом остаётся, просто не переживёт
@@ -29,8 +29,19 @@ import {
 } from '../../../i18n';
 // Запись выбора — мимо барьера `i18n`, см. комментарий в его `index.ts`.
 import { changeLocale } from '../../../i18n/persistence';
+import {
+  THEME_MODES,
+  changeThemeMode,
+  getThemeMode,
+  type ThemeMode,
+} from '../../../theme/themeMode';
 import { describeError } from '../../checklist/errorMessages';
-import { IDLE, LOCALE_TEST_ID_PREFIX, TEST_IDS } from './constants';
+import {
+  IDLE,
+  LOCALE_TEST_ID_PREFIX,
+  TEST_IDS,
+  THEME_TEST_ID_PREFIX,
+} from './constants';
 import {
   ErrorText,
   Hint,
@@ -50,6 +61,10 @@ export function SettingsScreen() {
   // один, и `useTranslation` уже перерисовывает экран при его смене.
   const locale = getLocale();
   const [saveState, setSaveState] = useState<SaveState>(IDLE);
+  // Выбор темы — в состоянии экрана: `useColorScheme()` отвечает только
+  // «светлая или тёмная» и не отличает «Как в системе» от явного выбора.
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getThemeMode);
+  const [themeSaveState, setThemeSaveState] = useState<SaveState>(IDLE);
 
   const handleSelect = useCallback(async (next: Locale) => {
     if (next === getLocale()) {
@@ -66,6 +81,23 @@ export function SettingsScreen() {
       setSaveState(IDLE);
     } catch (error) {
       setSaveState({ status: 'failed', message: describeError(error) });
+    }
+  }, []);
+
+  const handleSelectTheme = useCallback(async (next: ThemeMode) => {
+    if (next === getThemeMode()) {
+      return;
+    }
+
+    setThemeMode(next);
+    try {
+      await changeThemeMode(next);
+      AccessibilityInfo.announceForAccessibility(
+        translations().settings.announceThemeChanged,
+      );
+      setThemeSaveState(IDLE);
+    } catch (error) {
+      setThemeSaveState({ status: 'failed', message: describeError(error) });
     }
   }, []);
 
@@ -116,6 +148,52 @@ export function SettingsScreen() {
             testID={TEST_IDS.saveError}
           >
             {saveState.message}
+          </ErrorText>
+        ) : null}
+      </Section>
+
+      <Section>
+        <SectionTitle accessibilityRole="header">
+          {t.settings.themeTitle}
+        </SectionTitle>
+        <Hint>{t.settings.themeHint}</Hint>
+
+        <OptionList accessibilityRole="radiogroup" testID={TEST_IDS.themeGroup}>
+          {THEME_MODES.map(option => {
+            const selected = option === themeMode;
+            const name = t.settings.themeNames[option];
+
+            return (
+              <Option
+                key={option}
+                $selected={selected}
+                accessibilityRole="radio"
+                accessibilityState={{ checked: selected }}
+                accessibilityLabel={
+                  selected
+                    ? t.settings.themeSelectedA11y(name)
+                    : t.settings.themeA11y(name)
+                }
+                testID={`${THEME_TEST_ID_PREFIX}-${option}`}
+                style={({ pressed }) => (pressed ? pressedStyle : undefined)}
+                onPress={() => handleSelectTheme(option)}
+              >
+                <OptionLabel $selected={selected}>{name}</OptionLabel>
+                {selected ? (
+                  <SelectedMark>{t.settings.themeSelected}</SelectedMark>
+                ) : null}
+              </Option>
+            );
+          })}
+        </OptionList>
+
+        {themeSaveState.status === 'failed' ? (
+          <ErrorText
+            accessibilityRole="alert"
+            accessibilityLiveRegion="polite"
+            testID={TEST_IDS.themeSaveError}
+          >
+            {themeSaveState.message}
           </ErrorText>
         ) : null}
       </Section>

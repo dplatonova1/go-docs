@@ -9,11 +9,11 @@ import { useCallback } from 'react';
 
 import { ApplicationListScreen } from '../../features/checklist/ApplicationListScreen';
 import type { Application } from '../../features/checklist/model';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 
 export function ApplicationListRoute() {
   const navigation =
-    useNavigation<NativeStackNavigationProp<RootStackParamList>>();
+    useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
   // Список перечитывается при возврате: заявку могли открыть,
   // переименовать или удалить с другого экрана, и порядок «недавние
   // сверху» изменился.
@@ -39,22 +39,12 @@ export function ApplicationListRoute() {
     navigation.navigate('CreateApplication');
   }, [navigation]);
 
-  const handleOpenLibrary = useCallback(() => {
-    navigation.navigate('DocumentLibrary');
-  }, [navigation]);
-
-  const handleOpenSettings = useCallback(() => {
-    navigation.navigate('Settings');
-  }, [navigation]);
-
   return (
     <ApplicationListScreen
       isFocused={isFocused}
       onOpen={handleOpen}
       onRename={handleRename}
       onCreate={handleCreate}
-      onOpenLibrary={handleOpenLibrary}
-      onOpenSettings={handleOpenSettings}
     />
   );
 }

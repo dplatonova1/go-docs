@@ -193,12 +193,16 @@ describe('attachLibraryDocumentToItem', () => {
     // Файл не перечитывается и в `documents` ничего не пишется — ради
     // этого документы и общие (ADR-0010).
     expect(
-      tx.execute.mock.calls.some(([sql]) => sql.includes('INSERT INTO documents')),
+      tx.execute.mock.calls.some(([sql]) =>
+        sql.includes('INSERT INTO documents'),
+      ),
     ).toBe(false);
   });
 
   it('повторное прикрепление — значение, а не исключение', async () => {
-    const tx = mockTransaction(sql => (sql.startsWith('SELECT') ? [{ 1: 1 }] : []));
+    const tx = mockTransaction(sql =>
+      sql.startsWith('SELECT') ? [{ 1: 1 }] : [],
+    );
 
     await expect(
       attachLibraryDocumentToItem(ITEM_ID, DOCUMENT_ID),

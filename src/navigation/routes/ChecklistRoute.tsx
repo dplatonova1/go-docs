@@ -17,10 +17,10 @@ import type {
   ChecklistItemId,
 } from '../../features/checklist/model';
 import { markApplicationOpened } from '../../features/checklist/repository';
-import type { RootStackParamList } from '../RootNavigator/types';
+import type { HomeStackParamList } from '../RootNavigator/types';
 import { ApplicationGate } from './ApplicationGate';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'Checklist'>;
+type Props = NativeStackScreenProps<HomeStackParamList, 'Checklist'>;
 
 export function ChecklistRoute({ route, navigation }: Props) {
   const { applicationId } = route.params;

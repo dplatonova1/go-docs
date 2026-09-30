@@ -5,16 +5,16 @@
 
 ## Модули
 
-| Файл | Назначение |
-|---|---|
-| [`locales/ru.ts`](./locales/ru.ts) | Русский словарь — **источник правды по набору ключей** |
-| [`locales/en.ts`](./locales/en.ts) | Английский словарь, типизирован как `Messages` |
-| [`types.ts`](./types.ts) | `Locale` и `Messages = typeof ru` |
-| [`store.ts`](./store.ts) | Текущий язык: `getLocale`, `setLocale`, `translations`, подписка |
-| [`useTranslation.ts`](./useTranslation.ts) | Хук для компонентов, подписан на стор |
-| [`systemLocale.ts`](./systemLocale.ts) | Язык устройства — значение по умолчанию |
-| [`persistence.ts`](./persistence.ts) | Чтение и запись выбора языка на диск |
-| [`constants.ts`](./constants.ts) | `MESSAGES`, `LOCALES`, `LOCALE_NAMES`, фолбэк |
+| Файл                                       | Назначение                                                       |
+| ------------------------------------------ | ---------------------------------------------------------------- |
+| [`locales/ru.ts`](./locales/ru.ts)         | Русский словарь — **источник правды по набору ключей**           |
+| [`locales/en.ts`](./locales/en.ts)         | Английский словарь, типизирован как `Messages`                   |
+| [`types.ts`](./types.ts)                   | `Locale` и `Messages = typeof ru`                                |
+| [`store.ts`](./store.ts)                   | Текущий язык: `getLocale`, `setLocale`, `translations`, подписка |
+| [`useTranslation.ts`](./useTranslation.ts) | Хук для компонентов, подписан на стор                            |
+| [`systemLocale.ts`](./systemLocale.ts)     | Язык устройства — значение по умолчанию                          |
+| [`persistence.ts`](./persistence.ts)       | Чтение и запись выбора языка на диск                             |
+| [`constants.ts`](./constants.ts)           | `MESSAGES`, `LOCALES`, `LOCALE_NAMES`, фолбэк                    |
 
 ## Как брать текст
 

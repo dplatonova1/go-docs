@@ -81,7 +81,10 @@ beforeEach(() => {
   });
   repository.attachDocumentToItem.mockImplementation(async () => {
     log.push('db');
-    return { status: 'created', document: { id: 'doc-1', name: 'Паспорт.pdf' } };
+    return {
+      status: 'created',
+      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+    };
   });
   repository.attachLibraryDocumentToItem.mockImplementation(async () => {
     log.push('link');
@@ -160,7 +163,9 @@ describe('дедупликация по содержимому', () => {
 
   it('тот же файл уже прикреплён к этому пункту — отдельный исход', async () => {
     repository.findDocumentByContentHash.mockResolvedValue(EXISTING);
-    repository.attachLibraryDocumentToItem.mockResolvedValue('already-attached');
+    repository.attachLibraryDocumentToItem.mockResolvedValue(
+      'already-attached',
+    );
 
     const result = await attachPickedDocument(ITEM_ID, PICKED);
 

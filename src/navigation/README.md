@@ -4,25 +4,38 @@
 
 ## Структура
 
-Стек один, `native-stack`
-([ADR-0014](../../docs/adr/0014-react-navigation-native-stack.md)):
+Нижняя панель вкладок, у каждой вкладки свой `native-stack`
+([ADR-0014](../../docs/adr/0014-react-navigation-native-stack.md),
+[ADR-0022](../../docs/adr/0022-bottom-tabs.md)):
 
 ```
-RootStack
-├── ApplicationList          — список заявок, корень
-├── Checklist                — { applicationId }
-├── CreateApplication
-├── RenameApplication        — { applicationId }, модально
-├── DocumentLibrary          — библиотека документов
-├── PickDocumentFromLibrary  — { itemId }, выбор файла для пункта
-└── Settings                 — настройки: язык интерфейса
+Tabs (bottom-tabs, панель — TabBar)
+├── HomeTab «Главная»
+│   ├── ApplicationList          — список заявок, корень
+│   ├── Checklist                — { applicationId }
+│   ├── CreateApplication
+│   ├── RenameApplication        — { applicationId }, модально
+│   └── PickDocumentFromLibrary  — { itemId }, выбор файла для пункта
+├── LibraryTab «Библиотека»
+│   └── DocumentLibrary          — вся библиотека документов
+└── SettingsTab «Настройки»
+    └── Settings                 — язык интерфейса
 ```
+
+Вкладка помнит своё место: открытый чек-лист не теряется, пока
+пользователь в библиотеке. «Назад» с корня любой вкладки ведёт на
+«Главную» (`backBehavior: firstRoute`).
+
+Панель своя — [`TabBar`](./TabBar/TabBar.tsx): выбранная вкладка
+отмечена цветом `indicator` и, чтобы не полагаться на один цвет,
+полужирной подписью; на Android панель прячется, пока открыта
+клавиатура.
 
 При запуске [`useBootstrap`](./RootNavigator/useBootstrap.ts) применяет
 сохранённый язык ([ADR-0021](../../docs/adr/0021-runtime-localization.md)
 — первым шагом, чтобы сообщение о недоступной базе вышло на выбранном
 языке), применяет миграции, читает последнюю открытую заявку и собирает
-стартовый стек
+стартовый стек вкладки «Главная»
 ([`initialNavigationState`](./RootNavigator/initialNavigationState.ts)):
 список, а поверх него — чек-лист последней открытой заявки, а если заявок
 нет вообще — экран создания
@@ -50,19 +63,20 @@ RootStack
   аппаратную кнопку разом) и переход на созданную заявку;
 - `ApplicationListRoute` — переходы из списка; перечитывание списка при
   возврате фокуса;
-- `SettingsRoute` — склейка без своей логики: из настроек никуда не
-  уходят, только назад кнопкой в шапке.
+- `SettingsRoute`, `DocumentLibraryRoute` — корни вкладок «Настройки» и
+  «Библиотека».
 
-Заголовки экранов в шапке берутся из словаря
-([`i18n`](../i18n/README.md)), поэтому `RootNavigator` вызывает
-`useTranslation()` — при смене языка шапки меняются вместе с экранами.
+Заголовки экранов в шапке и подписи вкладок берутся из словаря
+([`i18n`](../i18n/README.md)), поэтому `RootNavigator` и стеки
+([`stacks.tsx`](./RootNavigator/stacks.tsx)) вызывают `useTranslation()` — при смене языка шапки меняются вместе с экранами.
 
 Поэтому у обёрток нет папки на компонент со `styles.ts` и `constants.ts`
 — это склейка, а не элементы интерфейса.
 
 ## Конвенции
 
-- **Параметры маршрутов типизированы** (`RootStackParamList` в
+- **Параметры маршрутов типизированы** (`RootTabParamList` и стеки
+  вкладок — `HomeStackParamList` и др. — в
   [`RootNavigator/types.ts`](./RootNavigator/types.ts)) — никаких `any` в
   `navigate`. Тот же файл подключает типы к `useNavigation()` через
   `ReactNavigation.RootParamList`.

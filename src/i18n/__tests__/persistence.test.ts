@@ -15,8 +15,8 @@ jest.mock('../../storage/settings', () => ({
 
 const settings = require('../../storage/settings');
 
-const { changeLocale, loadStoredLocale } = require('../persistence') as
-  typeof import('../persistence');
+const { changeLocale, loadStoredLocale } =
+  require('../persistence') as typeof import('../persistence');
 
 beforeEach(() => {
   jest.clearAllMocks();

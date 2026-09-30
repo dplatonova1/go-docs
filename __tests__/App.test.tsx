@@ -27,6 +27,15 @@ jest.mock('../src/i18n/persistence', () => ({
   changeLocale: jest.fn().mockResolvedValue(undefined),
 }));
 
+// Выбор темы лежит в том же файле настроек и применяется нативным
+// `Appearance`; его проверяет `theme/__tests__/themeMode.test.ts`.
+jest.mock('../src/theme/themeMode', () => ({
+  loadStoredThemeMode: jest.fn().mockResolvedValue(undefined),
+  THEME_MODES: ['system', 'light', 'dark'],
+  getThemeMode: () => 'system',
+  changeThemeMode: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('../src/db/client', () => ({
   runMigrations: jest.fn().mockResolvedValue(undefined),
 }));

@@ -214,7 +214,9 @@ describe('удаление заявки', () => {
 
     await press(tree, 'reset-application-button');
 
-    expect(repository.getApplicationDeletionImpact).toHaveBeenCalledWith('app-1');
+    expect(repository.getApplicationDeletionImpact).toHaveBeenCalledWith(
+      'app-1',
+    );
     const { title, message, buttons } = lastAlert();
     expect(title).toBe('Удалить заявку «ВНЖ Сербия»?');
     expect(message).toContain('пункты чек-листа этой заявки (2)');
@@ -353,13 +355,19 @@ describe('сборка пакета', () => {
 
     expect(packageFeature.buildPackage).not.toHaveBeenCalled();
     const error = findByTestId(tree, 'package-error');
-    expect(String(error.props.children)).toContain('не хватает свободного места');
+    expect(String(error.props.children)).toContain(
+      'не хватает свободного места',
+    );
   });
 
   it('показывает ход сборки и не даёт запустить её дважды', async () => {
     let finish: (value: unknown) => void = () => {};
     packageFeature.buildPackage.mockImplementation(
-      (_application: unknown, _plan: unknown, onProgress: (p: unknown) => void) =>
+      (
+        _application: unknown,
+        _plan: unknown,
+        onProgress: (p: unknown) => void,
+      ) =>
         new Promise(resolve => {
           onProgress({ processed: 1, total: 3 });
           finish = resolve;
@@ -465,7 +473,10 @@ describe('прикрепление файла', () => {
 
     // Вторая кнопка — выбор уже загруженного: подпись должна отличать
     // её от первой не только словом «библиотека» на экране.
-    const fromLibrary = findByTestId(tree, 'checklist-item-1-pick-from-library');
+    const fromLibrary = findByTestId(
+      tree,
+      'checklist-item-1-pick-from-library',
+    );
     expect(fromLibrary.props.accessibilityLabel).toBe(
       'Прикрепить к пункту 2: Фото файл, уже загруженный в приложение',
     );
@@ -661,7 +672,8 @@ describe('открепление файла от пункта', () => {
     expect(button.props.accessibilityLabel).toBe(
       'Открепить файл Паспорт.pdf от пункта 1: Паспорт',
     );
-    expect(button.props.label).toBe('Открепить');
+    // Кнопка — иконка: видимой надписи нет, действие называет подпись.
+    expect(button.props.icon).toBe('close');
     expect(interactiveWithoutA11y(tree)).toEqual([]);
   });
 
@@ -734,8 +746,8 @@ describe('открепление файла от пункта', () => {
 
     expect(repository.detachDocumentFromItem).toHaveBeenCalledTimes(1);
     expect(
-      findByTestId(tree, 'checklist-item-0-file-0-detach').props.label,
-    ).toBe('Открепление…');
+      findByTestId(tree, 'checklist-item-0-file-0-detach').props.busy,
+    ).toBe(true);
     expect(findByTestId(tree, 'checklist-item-1-attach').props.disabled).toBe(
       true,
     );
