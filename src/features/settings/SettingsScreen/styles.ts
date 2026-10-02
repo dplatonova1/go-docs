@@ -1,9 +1,9 @@
 import type { ViewStyle } from 'react-native';
-import { StyleSheet } from 'react-native';
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
-import { MIN_TOUCH_TARGET, RADII } from '../../../theme/metrics';
+import { CARD_LIST_GAP, RADII } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
+import { OPTION_MIN_HEIGHT } from './constants';
 import type { OptionStyleProps } from './types';
 
 export const Section = styled.View`
@@ -22,33 +22,45 @@ export const Hint = styled.Text`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
-/** Языки списком в столбик: их немного, и каждый читается целиком. */
+/**
+ * Языки списком в столбик: их немного, и каждый читается целиком.
+ * Промежуток — как между карточками: тень строки уходит за её край, и
+ * при 8 точках доходила до соседней.
+ */
 export const OptionList = styled.View`
-  gap: 8px;
+  gap: ${CARD_LIST_GAP}px;
   margin-top: 4px;
 `;
 
 /**
- * Строка языка.
+ * Строка языка или темы — в форме поля ввода (`theme/field.ts`):
+ * в покое подложка с бликом и кантом, выбранная — со свечением и
+ * градиентной рамкой, как поле в фокусе (решено 2026-10-02). Подложку и
+ * рамку подставляет экран: они задаются объектом стиля и компонентом.
  *
- * Выбранную обозначает не только цвет рамки, но и подпись рядом
- * («Выбран»): цветом одним различие не передать людям с нарушением
- * цветовосприятия, а скринридеру его сообщает `accessibilityState`.
+ * Выбранную обозначает не только рамка, но и подпись рядом («Выбран»):
+ * цветом одним различие не передать людям с нарушением цветовосприятия,
+ * а скринридеру его сообщает `accessibilityState`.
  */
-export const Option = styled.Pressable<OptionStyleProps>`
-  min-height: ${MIN_TOUCH_TARGET}px;
+export const Option = styled.Pressable`
+  min-height: ${OPTION_MIN_HEIGHT}px;
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 12px;
-  border-radius: ${RADII.lg}px;
-  border-width: ${({ $selected }) =>
-    $selected ? 2 : StyleSheet.hairlineWidth}px;
-  border-color: ${({ theme, $selected }) =>
-    $selected ? theme.colors.indicator : theme.colors.border};
+  padding: 12px 20px;
+  border-radius: ${RADII.field}px;
   background-color: ${({ theme }) => theme.colors.surface};
 `;
+
+/**
+ * Выбранная строка — поверх соседних. Строки рисуются по порядку, и тень
+ * следующей (она уходит вверх за край) ложилась на нижнюю кромку
+ * градиентной рамки выбранной и срезала её наполовину.
+ */
+export const selectedOptionStyle: ViewStyle = toStyleSheet(css`
+  z-index: 1;
+`);
 
 /** См. `components/Button/styles.ts`: Pressable отдаёт нажатие колбэком. */
 export const pressedStyle: ViewStyle = toStyleSheet(css`

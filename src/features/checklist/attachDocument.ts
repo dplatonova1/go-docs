@@ -41,6 +41,7 @@ import {
   type ChecklistItemId,
   type DocumentId,
 } from './model';
+import { makeThumbnail } from '../library/thumbnail';
 import { pickDocument, type PickedDocument } from './pickDocument';
 import {
   attachDocumentToItem,
@@ -130,6 +131,12 @@ export async function attachPickedDocument(
   // на середине файла.
   await assertEnoughSpace(bytes.length);
 
+  // Миниатюра — пока байты уже в памяти: потом для неё пришлось бы
+  // расшифровывать файл целиком. Не получилась — документ всё равно
+  // прикрепляется, в плитке будет заглушка.
+  const mimeType = sanitizeSourceText(picked.mimeType);
+  const thumbnail = await makeThumbnail(bytes, mimeType);
+
   let outcome;
   try {
     await writeFile(filePath, bytes);
@@ -138,9 +145,10 @@ export async function attachPickedDocument(
       itemId,
       filePath,
       originalFilename: name,
-      mimeType: sanitizeSourceText(picked.mimeType),
+      mimeType,
       sizeBytes: bytes.length,
       contentHash,
+      thumbnail,
     });
   } catch (error) {
     // Файл мог записаться целиком или частично, а строки для него нет.

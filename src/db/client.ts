@@ -121,7 +121,7 @@ export async function getDb(): Promise<DB> {
   }
 
   opening ??= openConnection()
-    .then((db) => {
+    .then(db => {
       connection = db;
       return db;
     })
@@ -169,7 +169,7 @@ export async function withTransaction<T>(
   let outcome: { readonly value: T } | undefined;
   const db = await getDb();
 
-  await db.transaction(async (tx) => {
+  await db.transaction(async tx => {
     outcome = { value: await fn(tx) };
   });
 
@@ -230,14 +230,15 @@ export async function runMigrations(): Promise<void> {
   } catch (error) {
     throw new StorageError(
       StorageErrorCode.DatabaseFailure,
-      error instanceof Error ? error.message : 'Не удалось определить ' +
-        'список миграций к применению',
+      error instanceof Error
+        ? error.message
+        : 'Не удалось определить ' + 'список миграций к применению',
     );
   }
 
   for (const migration of pending) {
     try {
-      await withTransaction(async (tx) => {
+      await withTransaction(async tx => {
         for (const statement of migration.statements) {
           await tx.execute(statement);
         }

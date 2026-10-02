@@ -21,7 +21,7 @@ const all = [migration(1), migration(2), migration(3)];
 describe('selectPendingMigrations', () => {
   it('на чистой базе применяет всё', () => {
     const pending = selectPendingMigrations(all, new Set());
-    expect(pending.map((m) => m.version)).toEqual([1, 2, 3]);
+    expect(pending.map(m => m.version)).toEqual([1, 2, 3]);
   });
 
   it('идемпотентна: когда всё применено, не возвращает ничего', () => {
@@ -31,19 +31,19 @@ describe('selectPendingMigrations', () => {
 
   it('применяет только то, что выше текущего максимума', () => {
     const pending = selectPendingMigrations(all, new Set([1, 2]));
-    expect(pending.map((m) => m.version)).toEqual([3]);
+    expect(pending.map(m => m.version)).toEqual([3]);
   });
 
   it('сортирует по возрастанию независимо от порядка в массиве', () => {
     const shuffled = [migration(3), migration(1), migration(2)];
     const pending = selectPendingMigrations(shuffled, new Set());
-    expect(pending.map((m) => m.version)).toEqual([1, 2, 3]);
+    expect(pending.map(m => m.version)).toEqual([1, 2, 3]);
   });
 
   it('продолжает с места остановки после частичного сбоя', () => {
     // Миграция 2 упала: применена только 1.
     const pending = selectPendingMigrations(all, new Set([1]));
-    expect(pending.map((m) => m.version)).toEqual([2, 3]);
+    expect(pending.map(m => m.version)).toEqual([2, 3]);
   });
 
   it('не пропускает молча миграцию с номером ниже максимума', () => {
@@ -61,12 +61,12 @@ describe('selectPendingMigrations', () => {
 
 describe('MIGRATIONS', () => {
   it('версии уникальны', () => {
-    const versions = MIGRATIONS.map((m) => m.version);
+    const versions = MIGRATIONS.map(m => m.version);
     expect(new Set(versions).size).toBe(versions.length);
   });
 
   it('версии идут по возрастанию начиная с 1', () => {
-    const versions = MIGRATIONS.map((m) => m.version);
+    const versions = MIGRATIONS.map(m => m.version);
     expect(versions).toEqual([...versions].sort((a, b) => a - b));
     expect(versions[0]).toBe(1);
   });
@@ -83,7 +83,7 @@ describe('MIGRATIONS', () => {
   });
 
   it('первая миграция создаёт все пять таблиц Фазы 0', () => {
-    const sql = MIGRATIONS.flatMap((m) => m.statements).join('\n');
+    const sql = MIGRATIONS.flatMap(m => m.statements).join('\n');
 
     for (const table of [
       'applications',
@@ -119,6 +119,15 @@ describe('MIGRATIONS', () => {
     expect(sql).toContain('ON documents(content_hash)');
   });
 
+  it('миграция 4 добавляет миниатюру документа', () => {
+    // ADR-0017, «Обновление»: миниатюра — в строке документа, а не
+    // отдельным файлом.
+    const fourth = MIGRATIONS.find(item => item.version === 4);
+    const sql = (fourth?.statements ?? []).join(' ');
+
+    expect(sql).toContain('ALTER TABLE documents ADD COLUMN thumbnail BLOB');
+  });
+
   it('внешние ключи покрыты индексами', () => {
     // Без индекса по дочерней колонке каскадное удаление превращается в
     // полный перебор таблицы на каждую удаляемую родительскую строку.
@@ -142,7 +151,7 @@ describe('MIGRATIONS', () => {
     // Допустимые значения держатся на уровне БД, а не на аккуратности
     // вызывающего кода: опечатка 'complete' вместо 'completed'
     // записалась бы молча, а фильтр по статусу её потом не нашёл бы.
-    const sql = MIGRATIONS.flatMap((m) => m.statements).join(' ');
+    const sql = MIGRATIONS.flatMap(m => m.statements).join(' ');
 
     expect(sql).toContain(
       "CHECK (status IN ('in_progress', 'completed', 'archived'))",
@@ -158,14 +167,14 @@ describe('MIGRATIONS', () => {
     // В SQLite CHECK со значением NULL нарушением не считается, поэтому
     // NULL прошёл бы и без этого условия. Но полагаться на такую тонкость
     // в схеме, которую будут читать люди, не стоит — пишем явно.
-    const sql = MIGRATIONS.flatMap((m) => m.statements).join(' ');
+    const sql = MIGRATIONS.flatMap(m => m.statements).join(' ');
 
     expect(sql).toContain('application_type IS NULL');
     expect(sql).toContain('quality_flag IS NULL');
   });
 
   it('связи объявлены с ON DELETE CASCADE', () => {
-    const sql = MIGRATIONS.flatMap((m) => m.statements).join('\n');
+    const sql = MIGRATIONS.flatMap(m => m.statements).join('\n');
     const references = sql.match(/REFERENCES\s+\w+\(\w+\)[^,\n]*/g) ?? [];
 
     expect(references.length).toBeGreaterThan(0);

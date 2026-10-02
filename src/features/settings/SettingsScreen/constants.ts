@@ -16,3 +16,6 @@ export const TEST_IDS = {
   themeGroup: 'settings-theme-group',
   themeSaveError: 'settings-theme-error',
 } as const;
+
+/** Высота строки выбора — как у однострочного поля ввода. */
+export const OPTION_MIN_HEIGHT = 52;

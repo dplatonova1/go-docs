@@ -106,7 +106,8 @@ const SELECT_CHECKLIST_ITEMS =
   'WHERE application_id = ? ORDER BY position';
 
 const SELECT_ATTACHED_DOCUMENTS =
-  'SELECT cid.checklist_item_id, d.id, d.original_filename ' +
+  'SELECT cid.checklist_item_id, d.id, d.original_filename, ' +
+  'd.mime_type, d.size_bytes, d.file_path ' +
   'FROM checklist_items ci ' +
   'JOIN checklist_item_documents cid ON cid.checklist_item_id = ci.id ' +
   'JOIN documents d ON d.id = cid.document_id ' +
@@ -120,12 +121,13 @@ const SELECT_ATTACHED_DOCUMENTS =
  */
 const INSERT_DOCUMENT =
   'INSERT OR IGNORE INTO documents ' +
-  '(id, original_filename, file_path, mime_type, size_bytes, content_hash, created_at, updated_at) ' +
-  'VALUES (?, ?, ?, ?, ?, ?, ?, ?)';
+  '(id, original_filename, file_path, mime_type, size_bytes, content_hash, thumbnail, created_at, updated_at) ' +
+  'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 /** Поиск уже загруженного файла по отпечатку содержимого. */
 const SELECT_DOCUMENT_BY_CONTENT_HASH =
-  'SELECT id, original_filename FROM documents WHERE content_hash = ?';
+  'SELECT id, original_filename, mime_type, size_bytes, file_path ' +
+  'FROM documents WHERE content_hash = ?';
 
 const INSERT_CHECKLIST_ITEM_DOCUMENT =
   'INSERT INTO checklist_item_documents ' +
@@ -203,6 +205,16 @@ const SELECT_DOCUMENT_USAGE =
 const SELECT_ITEM_IDS_OF_DOCUMENT =
   'SELECT checklist_item_id FROM checklist_item_documents WHERE document_id = ?';
 
+const SELECT_DOCUMENT_THUMBNAIL =
+  'SELECT thumbnail FROM documents WHERE id = ?';
+
+/**
+ * Только если миниатюры ещё нет: две строки, одновременно делающие
+ * миниатюру одному документу, не перезапишут друг друга.
+ */
+const UPDATE_DOCUMENT_THUMBNAIL =
+  'UPDATE documents SET thumbnail = ? WHERE id = ? AND thumbnail IS NULL';
+
 const SELECT_DOCUMENT_FILE_PATH =
   'SELECT file_path FROM documents WHERE id = ?';
 
@@ -278,6 +290,29 @@ function readCount(result: { readonly rows: readonly Row[] }): number {
   return readInteger(row, 'COUNT(*)', 'count');
 }
 
+/** Размер файла: целое число или `null` у старых записей. */
+function readSize(row: Row): number | null {
+  const size = row.size_bytes;
+  if (size !== null && (typeof size !== 'number' || !Number.isInteger(size))) {
+    throw malformedRow('documents', 'size_bytes');
+  }
+  return size;
+}
+
+/**
+ * Прикреплённый документ из строки `documents`. Тип, размер и путь —
+ * для превью в пункте чек-листа (`useDocumentPreview`).
+ */
+function toAttachedDocument(row: Row): AttachedDocument {
+  return {
+    id: readText(row, 'documents', 'id') as DocumentId,
+    name: readNullableText(row, 'documents', 'original_filename'),
+    mimeType: readNullableText(row, 'documents', 'mime_type'),
+    sizeBytes: readSize(row),
+    filePath: readText(row, 'documents', 'file_path'),
+  };
+}
+
 function toLibraryDocument(
   row: Row,
   attachedIds: ReadonlySet<string>,
@@ -332,10 +367,7 @@ function groupDocumentsByItem(
       'checklist_item_id',
     );
     const documents = byItem.get(itemId) ?? [];
-    documents.push({
-      id: readText(row, 'documents', 'id') as DocumentId,
-      name: readNullableText(row, 'documents', 'original_filename'),
-    });
+    documents.push(toAttachedDocument(row));
     byItem.set(itemId, documents);
   }
   return byItem;
@@ -491,12 +523,7 @@ export function findDocumentByContentHash(
     ]);
     const row = result.rows[0];
 
-    return row === undefined
-      ? null
-      : {
-          id: readText(row, 'documents', 'id') as DocumentId,
-          name: readNullableText(row, 'documents', 'original_filename'),
-        };
+    return row === undefined ? null : toAttachedDocument(row);
   });
 }
 
@@ -529,6 +556,7 @@ export function attachDocumentToItem(
         input.mimeType,
         input.sizeBytes,
         input.contentHash,
+        input.thumbnail,
         now,
         now,
       ]);
@@ -548,10 +576,7 @@ export function attachDocumentToItem(
         );
       }
 
-      const document: AttachedDocument = {
-        id: readText(row, 'documents', 'id') as DocumentId,
-        name: readNullableText(row, 'documents', 'original_filename'),
-      };
+      const document = toAttachedDocument(row);
       const created = document.id === input.id;
 
       const existingLink = await tx.execute(SELECT_LINK, [
@@ -594,6 +619,49 @@ export function attachDocumentToItem(
  * не осталось ни одной связи, не показывается нигде и не удаляется даже
  * при сбросе заявки — см. «Отложенные обязательства» в CLAUDE.md.
  */
+/**
+ * Миниатюра документа (`documents.thumbnail`, миграция 4) или `null`,
+ * если её нет: PDF, сбой разбора, запись старше миграции. Документ мог
+ * быть удалён — тогда тоже `null`.
+ *
+ * BLOB op-sqlite отдаёт как `ArrayBuffer`, `node:sqlite` в тестах — как
+ * `Uint8Array`; читаются оба.
+ */
+export function getDocumentThumbnail(
+  documentId: DocumentId,
+): Promise<Uint8Array | null> {
+  return guarded('Не удалось прочитать миниатюру', async () => {
+    const db = await getDb();
+    const result = await db.execute(SELECT_DOCUMENT_THUMBNAIL, [documentId]);
+    const value = result.rows[0]?.thumbnail;
+
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (value instanceof ArrayBuffer) {
+      return new Uint8Array(value);
+    }
+    if (ArrayBuffer.isView(value)) {
+      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    }
+    throw malformedRow('documents', 'thumbnail');
+  });
+}
+
+/**
+ * Записывает миниатюру, сделанную при первом показе документа, у
+ * которого её не было (записи старше миграции 4).
+ */
+export function saveDocumentThumbnail(
+  documentId: DocumentId,
+  thumbnail: Uint8Array,
+): Promise<void> {
+  return guarded('Не удалось сохранить миниатюру', async () => {
+    const db = await getDb();
+    await db.execute(UPDATE_DOCUMENT_THUMBNAIL, [thumbnail, documentId]);
+  });
+}
+
 export function detachDocumentFromItem(
   itemId: ChecklistItemId,
   documentId: DocumentId,

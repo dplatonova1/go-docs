@@ -1,21 +1,22 @@
 /**
- * Превью изображения из библиотеки.
+ * Превью документа для плитки карточки — по миниатюре
+ * ([`thumbnail.ts`](./thumbnail.ts)), а не по исходному файлу.
  *
- * Файлы лежат зашифрованными (ADR-0002), поэтому показать их напрямую по
- * пути нельзя: картинку нужно прочитать, расшифровать и отдать
- * `Image` как `data:`-URI.
+ * Миниатюра делается один раз при прикреплении и хранится в строке
+ * `documents` (миграция 4). Показ превью — это чтение нескольких
+ * килобайт из базы, без расшифровки файла: так снято ограничение
+ * «только JPEG/PNG до 2 МБ, расшифровка целиком при каждом показе»
+ * ([ADR-0017](../../../docs/adr/0017-document-library-screen.md),
+ * «Обновление»).
  *
- * Отсюда два ограничения, которые здесь и держатся:
+ * У записей, созданных до миграции 4, миниатюры нет. Для них она
+ * делается при первом показе — один раз расшифровывается исходный файл
+ * — и сразу сохраняется, так что дальше и они читаются из базы. Если
+ * файл сейчас на экране в нескольких местах, работа не повторяется:
+ * идущие запросы общие (`inFlight`).
  *
- * - превью делается только для JPEG и PNG. PDF без нативного рендерера
- *   страницы в картинку не превратить, и это не задача Фазы 2;
- * - файлы крупнее `MAX_PREVIEW_BYTES` пропускаются. Расшифровка идёт
- *   целиком в памяти, а base64 — это ещё треть сверху; на бюджетном
- *   Android несколько таких строк сразу означают нехватку памяти.
- *
- * Настоящие миниатюры (уменьшенная копия рядом с оригиналом, сделанная
- * один раз при прикреплении) — отдельная работа, см. «Отложенные
- * обязательства» в CLAUDE.md.
+ * PDF миниатюры не получает: без нативного рендерера страницу в
+ * картинку не превратить. В плитке — заглушка.
  *
  * Грузит по одной видимой строке: `FlatList` виртуализирован, и хук
  * живёт ровно столько, сколько строка на экране.
@@ -25,12 +26,20 @@ import { useEffect, useState } from 'react';
 
 import { bytesToBase64 } from '../../storage/base64';
 import { readFile, toRelativePath } from '../../storage/fs';
-import type { LibraryDocument } from '../checklist/model';
-
-/** Превью не делается для файлов крупнее — см. шапку модуля. */
-export const MAX_PREVIEW_BYTES = 2 * 1024 * 1024;
-
-const PREVIEWABLE_MIME_TYPES = ['image/jpeg', 'image/png'] as const;
+import {
+  MAX_ATTACHMENT_BYTES,
+  type DocumentId,
+  type LibraryDocument,
+} from '../checklist/model';
+import {
+  getDocumentThumbnail,
+  saveDocumentThumbnail,
+} from '../checklist/repository';
+import {
+  THUMBNAIL_MIME_TYPE,
+  canHaveThumbnail,
+  makeThumbnail,
+} from './thumbnail';
 
 export type PreviewState =
   | { readonly status: 'none' }
@@ -38,58 +47,114 @@ export type PreviewState =
   | { readonly status: 'ready'; readonly uri: string }
   | { readonly status: 'failed' };
 
+/**
+ * Что нужно хуку от документа — есть и у документа библиотеки, и у
+ * прикреплённого к пункту чек-листа.
+ */
+export type PreviewSource = Pick<
+  LibraryDocument,
+  'id' | 'mimeType' | 'sizeBytes' | 'filePath'
+>;
+
 const NONE: PreviewState = { status: 'none' };
 const LOADING: PreviewState = { status: 'loading' };
 const FAILED: PreviewState = { status: 'failed' };
 
-export function isPreviewable(document: LibraryDocument): boolean {
-  const mimeType = document.mimeType;
-
-  if (mimeType === null) {
-    return false;
-  }
-
-  if (!(PREVIEWABLE_MIME_TYPES as readonly string[]).includes(mimeType)) {
-    return false;
-  }
-
-  // Размер неизвестен у записей, созданных до появления колонки, —
-  // рисковать памятью ради них не стоит.
-  return document.sizeBytes !== null && document.sizeBytes <= MAX_PREVIEW_BYTES;
+/** У документа может быть миниатюра — снимок, а не PDF. */
+export function isPreviewable(document: PreviewSource): boolean {
+  return canHaveThumbnail(document.mimeType);
 }
 
-export function useDocumentPreview(document: LibraryDocument): PreviewState {
+/** Идущие загрузки миниатюр — общие для всех плиток одного документа. */
+const inFlight = new Map<DocumentId, Promise<Uint8Array | null>>();
+
+/**
+ * Миниатюра из базы, а если её нет — сделанная из исходного файла и
+ * сохранённая.
+ *
+ * @returns байты миниатюры или `null`, если её не сделать (размер
+ *   неизвестен или больше предела прикрепления, картинка не разбирается).
+ * @throws ошибки чтения базы и файла — плитка покажет «Файл недоступен».
+ */
+async function loadThumbnail(
+  document: PreviewSource,
+): Promise<Uint8Array | null> {
+  const stored = await getDocumentThumbnail(document.id);
+  if (stored !== null) {
+    return stored;
+  }
+
+  // Размер неизвестен у записей до Фазы 1, а больше предела прикрепления
+  // файлов быть не должно — рисковать памятью ради них не стоит.
+  if (
+    document.sizeBytes === null ||
+    document.sizeBytes > MAX_ATTACHMENT_BYTES
+  ) {
+    return null;
+  }
+
+  const bytes = await readFile(toRelativePath(document.filePath));
+  const thumbnail = await makeThumbnail(bytes, document.mimeType);
+
+  if (thumbnail !== null) {
+    // Не сохранилась — не беда: покажем сейчас, сделаем в следующий раз.
+    await saveDocumentThumbnail(document.id, thumbnail).catch(() => undefined);
+  }
+  return thumbnail;
+}
+
+function sharedLoad(document: PreviewSource): Promise<Uint8Array | null> {
+  const pending = inFlight.get(document.id);
+  if (pending !== undefined) {
+    return pending;
+  }
+
+  const started = loadThumbnail(document).finally(() => {
+    inFlight.delete(document.id);
+  });
+  inFlight.set(document.id, started);
+  return started;
+}
+
+export function useDocumentPreview(document: PreviewSource): PreviewState {
   const previewable = isPreviewable(document);
   const [state, setState] = useState<PreviewState>(
     previewable ? LOADING : NONE,
   );
 
-  const { filePath, mimeType } = document;
+  const { id, mimeType, sizeBytes, filePath } = document;
 
   useEffect(() => {
-    if (!previewable || mimeType === null) {
+    if (!previewable) {
       setState(NONE);
       return undefined;
     }
 
-    // Строка могла уехать с экрана, пока файл читался: обновлять
+    // Строка могла уехать с экрана, пока миниатюра грузилась: обновлять
     // состояние размонтированной строки не нужно.
     let cancelled = false;
     setState(LOADING);
 
-    readFile(toRelativePath(filePath)).then(
-      bytes => {
-        if (!cancelled) {
-          setState({
-            status: 'ready',
-            uri: `data:${mimeType};base64,${bytesToBase64(bytes)}`,
-          });
+    sharedLoad({ id, mimeType, sizeBytes, filePath }).then(
+      thumbnail => {
+        if (cancelled) {
+          return;
         }
+        setState(
+          thumbnail === null
+            ? NONE
+            : {
+                status: 'ready',
+                uri: `data:${THUMBNAIL_MIME_TYPE};base64,${bytesToBase64(
+                  thumbnail,
+                )}`,
+              },
+        );
       },
       () => {
         // Файла нет или он не расшифровывается. Для строки списка это не
-        // повод показывать ошибку на весь экран: место превью просто
-        // остаётся пустым, а сам документ виден и удаляем.
+        // повод показывать ошибку на весь экран: в плитке заглушка, а
+        // сам документ виден и удаляем.
         if (!cancelled) {
           setState(FAILED);
         }
@@ -99,7 +164,7 @@ export function useDocumentPreview(document: LibraryDocument): PreviewState {
     return () => {
       cancelled = true;
     };
-  }, [previewable, filePath, mimeType]);
+  }, [previewable, id, mimeType, sizeBytes, filePath]);
 
   return state;
 }

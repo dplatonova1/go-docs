@@ -57,7 +57,10 @@ it('различает изображения, PDF и всё остальное'
       document('d2', 'image/png'),
       document('d3', 'application/pdf'),
       // Записи до ограничения типов пикера: их встроить нечем.
-      document('d4', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'),
+      document(
+        'd4',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ),
       document('d5', 'image/heic'),
       document('d6', null),
     ]),

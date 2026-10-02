@@ -15,11 +15,12 @@
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { Card } from '../../../components/Card';
 import { TextField } from '../../../components/TextField';
 import { useTranslation } from '../../../i18n';
 import { formatChecklistLabel } from '../parseChecklistText';
 import { ITEM_MIN_LINES, TEST_ID_PREFIX } from './constants';
-import { Actions, Container } from './styles';
+import { Actions } from './styles';
 import type { DraftItemRowProps } from './types';
 
 export const DraftItemRow = memo(function DraftItemRowImpl({
@@ -54,7 +55,7 @@ export const DraftItemRow = memo(function DraftItemRowImpl({
   const handleRemove = useCallback(() => onRemove(key), [key, onRemove]);
 
   return (
-    <Container testID={testID}>
+    <Card testID={testID}>
       <TextField
         label={t.draftItem.label(number)}
         accessibilityLabel={t.draftItem.inputA11y(number, total)}
@@ -97,6 +98,6 @@ export const DraftItemRow = memo(function DraftItemRowImpl({
           onPress={handleRemove}
         />
       </Actions>
-    </Container>
+    </Card>
   );
 });

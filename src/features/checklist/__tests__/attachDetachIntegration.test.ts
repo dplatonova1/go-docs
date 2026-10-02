@@ -116,7 +116,15 @@ describe('прикрепление файла', () => {
   /** Поиск по отпечатку до записи ничего не находит, после — нашу строку. */
   function rowsForAttach(sql: string): Rows {
     return sql.includes('WHERE content_hash = ?')
-      ? [{ id: 'doc-1', original_filename: 'Паспорт.pdf' }]
+      ? [
+          {
+            id: 'doc-1',
+            original_filename: 'Паспорт.pdf',
+            mime_type: 'application/pdf',
+            size_bytes: 2048,
+            file_path: 'documents/doc-1',
+          },
+        ]
       : [];
   }
 
@@ -127,12 +135,18 @@ describe('прикрепление файла', () => {
 
     expect(result).toEqual({
       status: 'attached',
-      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+      document: {
+        id: 'doc-1',
+        name: 'Паспорт.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+        filePath: 'documents/doc-1',
+      },
     });
     expect(log).toEqual([
       `write-file ${FILE_PATH}`,
       'INSERT OR IGNORE',
-      'SELECT id, original_filename',
+      'SELECT id, original_filename,',
       'SELECT 1 FROM',
       'INSERT INTO checklist_item_documents',
       'UPDATE checklist_items SET',

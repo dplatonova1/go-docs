@@ -1,18 +1,8 @@
-import { StyleSheet } from 'react-native';
 import styled from 'styled-components/native';
 
 import { RADII } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 import type { StatusStyleProps } from './types';
-
-export const Container = styled.View`
-  gap: 8px;
-  padding: 12px;
-  border-radius: ${RADII.lg}px;
-  border-width: ${StyleSheet.hairlineWidth}px;
-  border-color: ${({ theme }) => theme.colors.divider};
-  background-color: ${({ theme }) => theme.colors.surface};
-`;
 
 export const Label = styled.Text`
   ${textSize(16)}
@@ -29,19 +19,19 @@ export const Label = styled.Text`
 export const StatusBadge = styled.View<StatusStyleProps>`
   align-self: flex-start;
   padding: 2px 8px;
-  border-radius: ${RADII.sm}px;
+  border-radius: ${RADII.pill}px;
   border-width: 1px;
   border-color: ${({ theme, $attached }) =>
-    $attached ? theme.colors.primary : theme.colors.border};
+    $attached ? theme.colors.attachedBorder : theme.colors.border};
   background-color: ${({ theme, $attached }) =>
-    $attached ? theme.colors.primary : theme.colors.surface};
+    $attached ? theme.colors.attachedSurface : theme.colors.surface};
 `;
 
 export const StatusText = styled.Text<StatusStyleProps>`
   ${textSize(13)}
   font-family: ${FONTS.medium};
   color: ${({ theme, $attached }) =>
-    $attached ? theme.colors.onPrimary : theme.colors.textSecondary};
+    $attached ? theme.colors.text : theme.colors.textSecondary};
 `;
 
 /**

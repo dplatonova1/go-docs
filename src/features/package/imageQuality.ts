@@ -163,10 +163,7 @@ function laplacianVariance(
  *   проверить не получилось.
  */
 export function assessQuality(sample: PixelSample): QualityFlag | null {
-  if (
-    sample.width < MIN_SIDE_FOR_CHECK ||
-    sample.height < MIN_SIDE_FOR_CHECK
-  ) {
+  if (sample.width < MIN_SIDE_FOR_CHECK || sample.height < MIN_SIDE_FOR_CHECK) {
     return null;
   }
 

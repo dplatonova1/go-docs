@@ -1,9 +1,14 @@
-import { StyleSheet } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import styled from 'styled-components/native';
 
-import { MIN_TOUCH_TARGET, RADII } from '../../theme/metrics';
+import { RADII } from '../../theme/metrics';
 import { FONTS, textSize } from '../../theme/typography';
-import { INPUT_VERTICAL_PADDING, LINE_HEIGHT_ESTIMATE } from './constants';
+import { GRADIENT_RING_WIDTH } from '../GradientRing';
+import {
+  FIELD_MIN_HEIGHT,
+  INPUT_VERTICAL_PADDING,
+  LINE_HEIGHT_ESTIMATE,
+} from './constants';
 import type { InputStyleProps } from './types';
 
 export const Container = styled.View`
@@ -16,27 +21,54 @@ export const Label = styled.Text`
   color: ${({ theme }) => theme.colors.text};
 `;
 
+/**
+ * Подложка поля: форма и заливка. Блик, кант и свечение — объектом из
+ * `theme.field` (см. `theme/field.ts`), их подставляет компонент.
+ */
+export const Field = styled.View`
+  border-radius: ${RADII.field}px;
+  background-color: ${({ theme }) => theme.colors.surface};
+`;
+
 export const Input = styled.TextInput<InputStyleProps>`
   min-height: ${({ $minLines }) =>
     Math.max(
-      MIN_TOUCH_TARGET,
+      FIELD_MIN_HEIGHT,
       $minLines * LINE_HEIGHT_ESTIMATE + INPUT_VERTICAL_PADDING,
     )}px;
-  border-radius: ${RADII.md}px;
-  padding: 8px 12px;
+  padding: ${INPUT_VERTICAL_PADDING / 2}px 20px;
   ${textSize(16)}
   font-family: ${FONTS.regular};
-  color: ${({ theme }) => theme.colors.text};
+  color: ${({ theme, $disabled }) =>
+    $disabled ? theme.colors.textSecondary : theme.colors.text};
   /* Android по умолчанию центрирует текст многострочного поля по
      вертикали — пустое высокое поле выглядит так, будто ввод посередине. */
   text-align-vertical: ${({ $multiline }) => ($multiline ? 'top' : 'auto')};
-  border-width: ${({ $hasError }) =>
-    $hasError ? 1 : StyleSheet.hairlineWidth}px;
-  /* Рамка — единственная граница поля, поэтому \`border\` (3:1), а не
-     декоративный \`divider\`. */
-  border-color: ${({ theme, $hasError }) =>
-    $hasError ? theme.colors.danger : theme.colors.border};
 `;
+
+/**
+ * Красная рамка ошибки — внутренней тенью, а не `border-width`: так она
+ * не сдвигает текст и не спорит с бликом подложки (см. `theme/accent.ts`
+ * про рамку поверх градиента). Добавляется к теням `theme.field`, а не
+ * заменяет их.
+ */
+export function withErrorRing(base: ViewStyle, color: string): ViewStyle {
+  const shadows = Array.isArray(base.boxShadow) ? base.boxShadow : [];
+  return {
+    ...base,
+    boxShadow: [
+      ...shadows,
+      {
+        inset: true,
+        offsetX: 0,
+        offsetY: 0,
+        blurRadius: 0,
+        spreadDistance: GRADIENT_RING_WIDTH,
+        color,
+      },
+    ],
+  };
+}
 
 export const ErrorText = styled.Text`
   ${textSize(13)}

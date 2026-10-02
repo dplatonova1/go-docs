@@ -1,4 +1,4 @@
-import type { Application, ApplicationId } from '../model';
+import type { Application } from '../model';
 
 export type ApplicationListScreenProps = {
   /**
@@ -23,9 +23,3 @@ export type ListState =
       readonly status: 'loaded';
       readonly applications: readonly Application[];
     };
-
-/** Удаление заявки: подсчёт последствий, ожидание, неудача. */
-export type DeleteState =
-  | { readonly status: 'idle' }
-  | { readonly status: 'working'; readonly applicationId: ApplicationId }
-  | { readonly status: 'failed'; readonly message: string };

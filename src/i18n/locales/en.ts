@@ -69,6 +69,7 @@ export const en: Messages = {
       'the list of documents from the authority website.',
     loadingA11y: 'Loading the list of applications',
     retryA11y: 'Try loading the list of applications again',
+    create: 'New application',
     createA11y: 'Create a new application',
   },
 
@@ -77,7 +78,6 @@ export const en: Messages = {
       `Application ${number} of ${total}: ${title}. Open the checklist`,
     rename: 'Rename',
     renameA11y: (title: string) => `Rename the application ${title}`,
-    deleteA11y: (title: string) => `Delete the application ${title}`,
   },
 
   checklist: {
@@ -201,13 +201,15 @@ export const en: Messages = {
     announceDeleted: 'File deleted from the library',
   },
 
+  documentPreview: {
+    none: 'No preview',
+    loading: 'Preview…',
+    failed: 'File unavailable',
+    noFile: 'No file',
+  },
+
   documentRow: {
     unnamedDocument: 'Unnamed file',
-    previewPlaceholder: {
-      none: 'No preview',
-      loading: 'Preview…',
-      failed: 'File unavailable',
-    },
     nameA11y: (number: number, total: number, name: string, added: string) =>
       `Document ${number} of ${total}: ${name}, added ${added}`,
     added: (date: string) => `Added ${date}`,

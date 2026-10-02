@@ -15,6 +15,7 @@ import { useCallback, useRef, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
 
 import { Button } from '../../../components/Button';
+import { GradientButton } from '../../../components/GradientButton';
 import { Screen } from '../../../components/Screen';
 import { TextField } from '../../../components/TextField';
 import { translations, useTranslation } from '../../../i18n';
@@ -22,7 +23,7 @@ import { describeError } from '../errorMessages';
 import { toNonEmptyText } from '../model';
 import { renameApplication } from '../repository';
 import { IDLE, SAVING, TEST_IDS } from './constants';
-import { Actions, FormError, Hint } from './styles';
+import { ActionSlot, Actions, FormError, Hint } from './styles';
 import type { RenameApplicationScreenProps, SaveState } from './types';
 
 export function RenameApplicationScreen({
@@ -97,22 +98,30 @@ export function RenameApplicationScreen({
       ) : null}
 
       <Actions>
-        <Button
-          label={isSaving ? t.common.saving : t.common.save}
-          accessibilityLabel={t.renameApplication.saveA11y}
-          testID={TEST_IDS.saveButton}
-          disabled={isSaving}
-          onPress={handleSave}
-        />
+        <ActionSlot>
+          <Button
+            variant="secondary"
+            size="large"
+            label={t.common.cancel}
+            accessibilityLabel={t.renameApplication.cancelA11y}
+            testID={TEST_IDS.cancelButton}
+            disabled={isSaving}
+            onPress={onCancel}
+          />
+        </ActionSlot>
 
-        <Button
-          variant="secondary"
-          label={t.common.cancel}
-          accessibilityLabel={t.renameApplication.cancelA11y}
-          testID={TEST_IDS.cancelButton}
-          disabled={isSaving}
-          onPress={onCancel}
-        />
+        <ActionSlot>
+          {/* Как «Собрать пакет»: главное действие экрана (решено
+              2026-10-02). Справа — привычное место подтверждения. */}
+          <GradientButton
+            accent="sky"
+            label={isSaving ? t.common.saving : t.common.save}
+            accessibilityLabel={t.renameApplication.saveA11y}
+            testID={TEST_IDS.saveButton}
+            disabled={isSaving}
+            onPress={handleSave}
+          />
+        </ActionSlot>
       </Actions>
     </Screen>
   );

@@ -1,3 +1,4 @@
+import type { AccentName } from '../../theme/accent';
 import type { ThemeColors } from '../../theme/colors';
 import type { ButtonVariant } from './types';
 
@@ -14,34 +15,41 @@ type ColorName = keyof ThemeColors;
  * «надпись/фон» остаются теми, контраст которых проверяет
  * `theme/__tests__/colors.test.ts`.
  *
- * У `secondary` своя заливка и мягкая рамка `secondaryBorder` — почему
- * она не держит 3:1, см. `theme/colors.ts`. `danger` — контур: заливка
- * цвета фона, красные надпись и рамка.
+ * `accent` — заливка из `theme.accents` поверх `background`: градиент,
+ * форма пилюли и свой цвет надписи вместо `label`. У `danger` это `rose`
+ * (решено 2026-10-01; прежде был красный контур), у `secondary` —
+ * `glass` (решено 2026-10-02; прежде серая заливка с рамкой).
+ *
+ * `background: null` — без своей заливки: полупрозрачное «стекло»
+ * `secondary` должно пропускать то, что под ним, — экран или карточку.
  */
 export const VARIANT_COLORS = {
   primary: {
     background: 'primary',
     label: 'onPrimary',
     border: null,
+    accent: null,
   },
   secondary: {
-    background: 'secondarySurface',
+    background: null,
     label: 'text',
-    border: 'secondaryBorder',
+    border: null,
+    accent: 'glass',
   },
-  // Не заливка, а контур: сплошная красная кнопка выглядела угрожающе
-  // (решено 2026-09-29). Заливка — фон экрана, а не `secondarySurface`:
-  // на более светлой заливке красный текст тёмной темы не держит 7:1.
+  // Приглушённая, а не сплошная красная: такая выглядела угрожающе
+  // (решено 2026-09-29). Необратимость сообщают надпись и подтверждение.
   danger: {
     background: 'background',
     label: 'danger',
-    border: 'danger',
+    border: null,
+    accent: 'rose',
   },
 } as const satisfies Record<
   ButtonVariant,
   {
-    background: ColorName;
+    background: ColorName | null;
     label: ColorName;
     border: ColorName | null;
+    accent: AccentName | null;
   }
 >;

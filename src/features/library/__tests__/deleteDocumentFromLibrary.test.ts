@@ -64,7 +64,5 @@ it('транзакция упала — файл цел, ошибка наруж
 it('файл не стёрся — для пользователя документ всё равно удалён', async () => {
   fs.deleteFile.mockRejectedValue(new Error('EBUSY'));
 
-  await expect(
-    deleteDocumentFromLibrary(DOCUMENT_ID),
-  ).resolves.toBeUndefined();
+  await expect(deleteDocumentFromLibrary(DOCUMENT_ID)).resolves.toBeUndefined();
 });

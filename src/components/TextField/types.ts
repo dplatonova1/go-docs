@@ -32,7 +32,7 @@ export type TextFieldProps = Omit<
 
 /** Пропсы оформления поля ввода, см. `styles.ts`. */
 export type InputStyleProps = {
-  $hasError: boolean;
   $multiline: boolean;
   $minLines: number;
+  $disabled: boolean;
 };

@@ -31,6 +31,12 @@ jest.mock('../../../storage/localCopy', () => ({
 
 jest.mock('../pickDocument', () => ({ pickDocument: jest.fn() }));
 
+// Миниатюру делает нативный модуль; здесь проверяется, что она уходит в
+// запись документа.
+jest.mock('../../library/thumbnail', () => ({
+  makeThumbnail: jest.fn(),
+}));
+
 jest.mock('../repository', () => ({
   attachDocumentToItem: jest.fn(),
   attachLibraryDocumentToItem: jest.fn(),
@@ -42,6 +48,9 @@ const fs = require('../../../storage/fs');
 const localCopy = require('../../../storage/localCopy');
 const { pickDocument } = require('../pickDocument');
 const repository = require('../repository');
+const { makeThumbnail } = require('../../library/thumbnail');
+
+const THUMBNAIL = new Uint8Array([0xff, 0xd8, 0xff]);
 
 const ITEM_ID = 'item-1' as ChecklistItemId;
 const BYTES = new Uint8Array([1, 2, 3, 4]);
@@ -59,6 +68,7 @@ beforeEach(() => {
   jest.resetAllMocks();
   log = [];
   ids.newId.mockReturnValue('doc-1');
+  makeThumbnail.mockResolvedValue(THUMBNAIL);
   localCopy.readCachedCopy.mockImplementation(async () => {
     log.push('read-copy');
     return BYTES;
@@ -113,7 +123,11 @@ describe('новый файл', () => {
       mimeType: 'application/pdf',
       sizeBytes: 4,
       contentHash: HASH,
+      thumbnail: THUMBNAIL,
     });
+    // Миниатюра — из тех же байтов, что пишутся на диск: файл второй раз
+    // не читается.
+    expect(makeThumbnail).toHaveBeenCalledWith(BYTES, 'application/pdf');
     expect(result).toEqual({
       status: 'attached',
       document: { id: 'doc-1', name: 'Паспорт.pdf' },

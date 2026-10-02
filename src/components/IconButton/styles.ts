@@ -1,7 +1,7 @@
 import type { ViewStyle } from 'react-native';
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
-import { MIN_TOUCH_TARGET } from '../../theme/metrics';
+import { MIN_TOUCH_TARGET, RADII } from '../../theme/metrics';
 import { DISABLED_OPACITY, PRESSED_OPACITY } from './constants';
 import type { ContainerStyleProps } from './types';
 
@@ -11,6 +11,7 @@ export const Container = styled.Pressable<ContainerStyleProps>`
   min-height: ${MIN_TOUCH_TARGET}px;
   justify-content: center;
   align-items: center;
+  border-radius: ${({ $filled }) => ($filled ? RADII.pill : 0)}px;
   opacity: ${({ $disabled }) => ($disabled ? DISABLED_OPACITY : 1)};
 `;
 

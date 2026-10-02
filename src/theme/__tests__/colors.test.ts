@@ -27,6 +27,28 @@ function relativeLuminance(hex: string): number {
   return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
 }
 
+/**
+ * Цвет `#RRGGBB` или `rgba(r, g, b, a)`, наложенный на непрозрачный
+ * `background`, — как его увидит пользователь.
+ */
+function opaque(color: string, background: string): string {
+  const rgba = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(color);
+  if (rgba === null) {
+    return color;
+  }
+  const alpha = Number(rgba[4]);
+  const hex = [1, 3, 5]
+    .map((start, i) => {
+      const under = parseInt(background.slice(start, start + 2), 16);
+      const over = Number(rgba[i + 1]);
+      return Math.round(over * alpha + under * (1 - alpha))
+        .toString(16)
+        .padStart(2, '0');
+    })
+    .join('');
+  return `#${hex}`;
+}
+
 function contrast(foreground: string, background: string): number {
   const a = relativeLuminance(foreground);
   const b = relativeLuminance(background);
@@ -37,32 +59,27 @@ describe.each<[string, ThemeColors]>([
   ['светлая тема', lightColors],
   ['тёмная тема', darkColors],
 ])('%s', (_name, colors) => {
-  describe.each(['background', 'surface'] as const)('на фоне %s', ground => {
-    it.each(['text', 'textSecondary', 'danger'] as const)(
-      '%s читается с контрастом не меньше 7:1',
-      token => {
-        expect(contrast(colors[token], colors[ground])).toBeGreaterThanOrEqual(
-          7,
-        );
-      },
-    );
+  describe.each(['background', 'surface'] as const)(
+    'на фоне %s',
+    groundName => {
+      const ground = opaque(colors[groundName], colors.background);
 
-    it('indicator (подпись активной вкладки) читается с контрастом не меньше 7:1', () => {
-      expect(contrast(colors.indicator, colors[ground])).toBeGreaterThanOrEqual(
-        7,
+      it.each(['text', 'textSecondary', 'danger'] as const)(
+        '%s читается с контрастом не меньше 7:1',
+        token => {
+          expect(contrast(colors[token], ground)).toBeGreaterThanOrEqual(7);
+        },
       );
-    });
 
-    it('рамки полей различимы с контрастом не меньше 3:1', () => {
-      expect(contrast(colors.border, colors[ground])).toBeGreaterThanOrEqual(3);
-    });
-  });
+      it('indicator (подпись активной вкладки) читается с контрастом не меньше 7:1', () => {
+        expect(contrast(colors.indicator, ground)).toBeGreaterThanOrEqual(7);
+      });
 
-  it('надпись вторичной кнопки читается на её заливке с контрастом не меньше 7:1', () => {
-    expect(
-      contrast(colors.text, colors.secondarySurface),
-    ).toBeGreaterThanOrEqual(7);
-  });
+      it('рамки полей различимы с контрастом не меньше 3:1', () => {
+        expect(contrast(colors.border, ground)).toBeGreaterThanOrEqual(3);
+      });
+    },
+  );
 
   it('onPrimary читается на primary с контрастом не меньше 7:1', () => {
     expect(contrast(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(

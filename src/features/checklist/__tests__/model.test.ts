@@ -2,10 +2,22 @@ import {
   isAttached,
   withAttachedDocument,
   withoutDocument,
+  type AttachedDocument,
   type ChecklistItem,
   type ChecklistItemId,
   type DocumentId,
 } from '../model';
+
+/** Прикреплённый документ для тестов: тип, размер и путь здесь не важны. */
+function attached(id: string, name: string | null): AttachedDocument {
+  return {
+    id: id as DocumentId,
+    name,
+    mimeType: 'application/pdf',
+    sizeBytes: 1024,
+    filePath: `documents/${id}`,
+  };
+}
 
 function item(
   id: string,
@@ -21,7 +33,7 @@ function item(
   };
 }
 
-const DOCUMENT = { id: 'd1' as DocumentId, name: 'scan.pdf' };
+const DOCUMENT = attached('d1', 'scan.pdf');
 
 describe('withAttachedDocument', () => {
   it('добавляет документ к своему пункту и отмечает его прикреплённым', () => {
@@ -41,7 +53,7 @@ describe('withAttachedDocument', () => {
   });
 
   it('дописывает второй документ после первого', () => {
-    const first = { id: 'd0' as DocumentId, name: null };
+    const first = attached('d0', null);
     const items = [item('a', { status: 'attached', documents: [first] })];
 
     const next = withAttachedDocument(items, 'a' as ChecklistItemId, DOCUMENT);
@@ -59,7 +71,7 @@ describe('withAttachedDocument', () => {
 });
 
 describe('withoutDocument', () => {
-  const OTHER = { id: 'd2' as DocumentId, name: 'second.pdf' };
+  const OTHER = attached('d2', 'second.pdf');
 
   it('убирает файл и возвращает пункт в «не прикреплено»', () => {
     const items = [

@@ -78,6 +78,7 @@ export const ru = {
       'документов с сайта ведомства.',
     loadingA11y: 'Загрузка списка заявок',
     retryA11y: 'Повторить загрузку списка заявок',
+    create: 'Создать заявку',
     createA11y: 'Создать новую заявку',
   },
 
@@ -86,7 +87,6 @@ export const ru = {
       `Заявка ${number} из ${total}: ${title}. Открыть чек-лист`,
     rename: 'Переименовать',
     renameA11y: (title: string) => `Переименовать заявку ${title}`,
-    deleteA11y: (title: string) => `Удалить заявку ${title}`,
   },
 
   checklist: {
@@ -226,15 +226,18 @@ export const ru = {
     announceDeleted: 'Файл удалён из библиотеки',
   },
 
+  /** Плитка превью документа: библиотека и пункт чек-листа. */
+  documentPreview: {
+    none: 'Без превью',
+    loading: 'Превью…',
+    failed: 'Файл недоступен',
+    noFile: 'Нет файла',
+  },
+
   documentRow: {
     /** Показывается вместо имени, если источник его не сообщил. */
     unnamedDocument: 'Файл без имени',
     /** Что написано вместо превью, когда картинки нет. */
-    previewPlaceholder: {
-      none: 'Без превью',
-      loading: 'Превью…',
-      failed: 'Файл недоступен',
-    } satisfies Record<'none' | 'loading' | 'failed', string>,
     nameA11y: (number: number, total: number, name: string, added: string) =>
       `Документ ${number} из ${total}: ${name}, добавлен ${added}`,
     added: (date: string) => `Добавлен ${date}`,

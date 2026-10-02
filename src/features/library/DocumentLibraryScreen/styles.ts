@@ -1,10 +1,11 @@
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
+import { CARD_LIST_GAP } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 
 /** См. `checklist/ChecklistScreen/styles.ts`. */
 export const listContentStyle = toStyleSheet(css`
-  gap: 8px;
+  gap: ${CARD_LIST_GAP}px;
 `);
 
 export const Header = styled.View`

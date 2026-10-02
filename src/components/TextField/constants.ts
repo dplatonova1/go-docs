@@ -13,5 +13,14 @@ export const ERROR_TEST_ID_SUFFIX = '-error';
  */
 export const LINE_HEIGHT_ESTIMATE = 24;
 
-/** Вертикальные отступы поля в сумме (8px сверху и снизу). */
-export const INPUT_VERTICAL_PADDING = 16;
+/** Вертикальные отступы поля в сумме (14px сверху и снизу). */
+export const INPUT_VERTICAL_PADDING = 28;
+
+/**
+ * Высота однострочного поля — с референса, около трети которой радиус
+ * (`RADII.field`). Больше `MIN_TOUCH_TARGET`.
+ */
+export const FIELD_MIN_HEIGHT = 52;
+
+/** Прозрачность плейсхолдера отключённого поля — тусклее обычного. */
+export const DISABLED_PLACEHOLDER_ALPHA = '99';

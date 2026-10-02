@@ -12,6 +12,9 @@
  * Заготовка: оформление минимальное, финальный дизайн будет позже.
  */
 
+import { useTheme } from 'styled-components/native';
+
+import { VARIANT_COLORS } from './constants';
 import { Container, Label, containerShadow, pressedStyle } from './styles';
 import type { ButtonProps } from './types';
 
@@ -21,10 +24,15 @@ export function Button({
   testID,
   disabled,
   variant = 'primary',
+  size = 'regular',
   style,
   ...rest
 }: ButtonProps) {
+  const theme = useTheme();
   const isDisabled = disabled === true;
+  const accent = VARIANT_COLORS[variant].accent;
+  // Градиент задаётся только объектом стиля, см. `theme/accent.ts`.
+  const fill = accent === null ? containerShadow : theme.accents[accent].fill;
 
   return (
     <Container
@@ -37,10 +45,13 @@ export function Button({
       disabled={isDisabled}
       $disabled={isDisabled}
       $variant={variant}
-      style={({ pressed }) => [containerShadow, pressed && pressedStyle, style]}
+      $size={size}
+      style={({ pressed }) => [fill, pressed && pressedStyle, style]}
       {...rest}
     >
-      <Label $variant={variant}>{label}</Label>
+      <Label $variant={variant} $size={size}>
+        {label}
+      </Label>
     </Container>
   );
 }

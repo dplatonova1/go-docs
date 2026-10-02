@@ -2,50 +2,29 @@
  * Список заявок — корневой экран приложения
  * ([ADR-0015](../../../../docs/adr/0015-multiple-applications-last-opened.md)).
  *
- * Здесь всё, что делают с заявкой целиком: открыть, переименовать,
- * удалить, создать новую. Порядок задаёт репозиторий — недавно открытые
- * сверху.
+ * Здесь заявку открывают, переименовывают и создают новую. Порядок задаёт
+ * репозиторий — недавно открытые сверху.
  *
- * Удаление необратимо, поэтому сначала диалог с числами: сколько пунктов
- * чек-листа пропадёт и сколько документов останется в библиотеке
+ * Удаления здесь нет (решено 2026-10-02): заявку удаляют с её экрана
+ * чек-листа, где видно, что именно пропадёт
  * ([ADR-0016](../../../../docs/adr/0016-application-deletion-keeps-documents.md)).
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  type ListRenderItemInfo,
-} from 'react-native';
-import { useTheme } from 'styled-components/native';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, type ListRenderItemInfo } from 'react-native';
 
 import { Button } from '../../../components/Button';
-import { PlusButton } from '../../../components/PlusButton';
+import { GradientSpinner } from '../../../components/GradientSpinner';
+import { GradientButton } from '../../../components/GradientButton';
 import { Screen } from '../../../components/Screen';
 import { useTranslation } from '../../../i18n';
 import { ApplicationRow } from '../ApplicationRow';
-import { applicationDeletionConfirmation } from '../confirmations';
 import { describeError } from '../errorMessages';
 import { applicationKeyOf, type Application } from '../model';
-import {
-  deleteApplication,
-  getApplicationDeletionImpact,
-  listApplications,
-} from '../repository';
-import { DELETE_IDLE, LOADING, TEST_IDS } from './constants';
-import {
-  CreateButtonSlot,
-  ErrorText,
-  Footer,
-  Hint,
-  listContentStyle,
-} from './styles';
-import type {
-  ApplicationListScreenProps,
-  DeleteState,
-  ListState,
-} from './types';
+import { listApplications } from '../repository';
+import { LOADING, TEST_IDS } from './constants';
+import { CreateButtonSlot, ErrorText, Hint, listContentStyle } from './styles';
+import type { ApplicationListScreenProps, ListState } from './types';
 
 export function ApplicationListScreen({
   isFocused = true,
@@ -54,14 +33,8 @@ export function ApplicationListScreen({
   onCreate,
 }: ApplicationListScreenProps) {
   const t = useTranslation();
-  const theme = useTheme();
   const [state, setState] = useState<ListState>(LOADING);
   const [attempt, setAttempt] = useState(0);
-  const [deleteState, setDeleteState] = useState<DeleteState>(DELETE_IDLE);
-  // Состояние доезжает до следующего рендера, а подтверждение в диалоге
-  // можно успеть нажать дважды — ref закрывает это синхронно.
-  const deletingRef = useRef(false);
-
   useEffect(() => {
     if (!isFocused) {
       return undefined;
@@ -94,72 +67,7 @@ export function ApplicationListScreen({
     setAttempt(value => value + 1);
   }, []);
 
-  const confirmDelete = useCallback(async (application: Application) => {
-    if (deletingRef.current) {
-      return;
-    }
-    deletingRef.current = true;
-    setDeleteState({ status: 'working', applicationId: application.id });
-
-    try {
-      await deleteApplication(application.id);
-      // Заявки уже нет — убираем строку на месте, без перечитывания
-      // списка и мигания индикатора.
-      setState(current =>
-        current.status === 'loaded'
-          ? {
-              status: 'loaded',
-              applications: current.applications.filter(
-                candidate => candidate.id !== application.id,
-              ),
-            }
-          : current,
-      );
-      setDeleteState(DELETE_IDLE);
-    } catch (error) {
-      setDeleteState({ status: 'failed', message: describeError(error) });
-    } finally {
-      deletingRef.current = false;
-    }
-  }, []);
-
-  const handleDelete = useCallback(
-    async (application: Application) => {
-      if (deletingRef.current) {
-        return;
-      }
-
-      setDeleteState({ status: 'working', applicationId: application.id });
-
-      try {
-        const impact = await getApplicationDeletionImpact(application.id);
-        setDeleteState(DELETE_IDLE);
-
-        const { title, message } = applicationDeletionConfirmation(
-          application.title,
-          impact,
-        );
-
-        Alert.alert(title, message, [
-          // Первой и с ролью cancel: случайное касание не должно удалять.
-          { text: t.common.cancel, style: 'cancel' },
-          {
-            text: t.common.delete,
-            style: 'destructive',
-            onPress: () => {
-              confirmDelete(application);
-            },
-          },
-        ]);
-      } catch (error) {
-        setDeleteState({ status: 'failed', message: describeError(error) });
-      }
-    },
-    [confirmDelete, t],
-  );
-
   const total = state.status === 'loaded' ? state.applications.length : 0;
-  const isDeleting = deleteState.status === 'working';
 
   const renderItem = useCallback(
     ({ item, index }: ListRenderItemInfo<Application>) => (
@@ -167,31 +75,11 @@ export function ApplicationListScreen({
         application={item}
         index={index}
         total={total}
-        actionsDisabled={isDeleting}
-        isDeleting={
-          deleteState.status === 'working' &&
-          deleteState.applicationId === item.id
-        }
         onOpen={onOpen}
         onRename={onRename}
-        onDelete={handleDelete}
       />
     ),
-    [total, isDeleting, deleteState, onOpen, onRename, handleDelete],
-  );
-
-  const footer = (
-    <Footer>
-      {deleteState.status === 'failed' ? (
-        <ErrorText
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-          testID={TEST_IDS.deleteError}
-        >
-          {deleteState.message}
-        </ErrorText>
-      ) : null}
-    </Footer>
+    [total, onOpen, onRename],
   );
 
   if (state.status === 'loaded') {
@@ -205,17 +93,18 @@ export function ApplicationListScreen({
           ListEmptyComponent={
             <Hint testID={TEST_IDS.empty}>{t.applicationList.emptyHint}</Hint>
           }
-          ListFooterComponent={footer}
           contentContainerStyle={listContentStyle}
         />
 
-        {/* По центру снизу, вне списка: создание — главное действие
+        {/* Снизу во всю ширину, вне списка: создание — главное действие
             экрана, и до него не нужно докручивать список. */}
         <CreateButtonSlot>
-          <PlusButton
+          <GradientButton
+            accent="sunset"
+            icon="add"
+            label={t.applicationList.create}
             accessibilityLabel={t.applicationList.createA11y}
             testID={TEST_IDS.createButton}
-            disabled={isDeleting}
             onPress={onCreate}
           />
         </CreateButtonSlot>
@@ -224,11 +113,12 @@ export function ApplicationListScreen({
   }
 
   return (
-    <Screen testID={TEST_IDS.screen}>
+    // Пока грузится — без прокрутки: лоадеру нужно растянуться на экран,
+    // чтобы встать по центру.
+    <Screen scrollable={state.status !== 'loading'} testID={TEST_IDS.screen}>
       {state.status === 'loading' ? (
-        <ActivityIndicator
-          size="large"
-          color={theme.colors.indicator}
+        <GradientSpinner
+          fill
           accessibilityLabel={t.applicationList.loadingA11y}
           testID={TEST_IDS.loading}
         />
@@ -242,6 +132,7 @@ export function ApplicationListScreen({
             {state.message}
           </ErrorText>
           <Button
+            variant="secondary"
             label={t.common.retry}
             accessibilityLabel={t.applicationList.retryA11y}
             testID={TEST_IDS.retryButton}

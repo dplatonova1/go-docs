@@ -21,14 +21,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Alert,
   FlatList,
   type ListRenderItemInfo,
 } from 'react-native';
-import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../../components/Button';
+import { GradientSpinner } from '../../../components/GradientSpinner';
+import { GradientButton } from '../../../components/GradientButton';
 import { Screen } from '../../../components/Screen';
 import { translations, useTranslation } from '../../../i18n';
 import {
@@ -117,7 +117,6 @@ export function ChecklistScreen({
   onReset,
 }: ChecklistScreenProps) {
   const t = useTranslation();
-  const theme = useTheme();
   const [state, setState] = useState<ItemsState>(LOADING);
   const [attempt, setAttempt] = useState(0);
   const [resetState, setResetState] = useState<ResetState>(RESET_IDLE);
@@ -486,7 +485,8 @@ export function ChecklistScreen({
             </ErrorText>
           ) : null}
 
-          <Button
+          <GradientButton
+            accent="sky"
             label={isBuildingPackage ? t.checklist.building : t.checklist.build}
             accessibilityLabel={t.checklist.buildA11y}
             testID={TEST_IDS.packageButton}
@@ -497,6 +497,7 @@ export function ChecklistScreen({
           {packageState.status === 'done' ? (
             <Button
               variant="secondary"
+              size="large"
               label={t.checklist.shareAgain}
               accessibilityLabel={t.checklist.shareAgainA11y}
               testID={TEST_IDS.packageShareButton}
@@ -518,8 +519,10 @@ export function ChecklistScreen({
           </ErrorText>
         ) : null}
 
-        <Button
-          variant="danger"
+        {/* Одного размера с «Собрать пакет»: оба — действия над заявкой
+            целиком. Заливка — как у остальных кнопок удаления. */}
+        <GradientButton
+          accent="rose"
           label={
             isResetting ? t.common.deleting : t.checklist.deleteApplication
           }
@@ -547,13 +550,14 @@ export function ChecklistScreen({
   }
 
   return (
-    <Screen testID={TEST_IDS.screen}>
+    // Пока грузится — без прокрутки: лоадеру нужно растянуться на экран,
+    // чтобы встать по центру.
+    <Screen scrollable={state.status !== 'loading'} testID={TEST_IDS.screen}>
       {header}
 
       {state.status === 'loading' ? (
-        <ActivityIndicator
-          size="large"
-          color={theme.colors.indicator}
+        <GradientSpinner
+          fill
           accessibilityLabel={t.checklist.loadingA11y}
           testID={TEST_IDS.loading}
         />
@@ -567,6 +571,7 @@ export function ChecklistScreen({
             {state.message}
           </ErrorText>
           <Button
+            variant="secondary"
             label={t.common.retry}
             accessibilityLabel={t.checklist.retryA11y}
             testID={TEST_IDS.retryButton}

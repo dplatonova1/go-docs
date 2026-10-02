@@ -27,6 +27,7 @@ import {
 } from 'react-native';
 
 import { Button } from '../../../components/Button';
+import { GradientButton } from '../../../components/GradientButton';
 import { Screen } from '../../../components/Screen';
 import { TextField } from '../../../components/TextField';
 import { translations, useTranslation } from '../../../i18n';
@@ -263,6 +264,7 @@ export function CreateApplicationScreen({
 
       <Button
         variant="secondary"
+        size="large"
         label={t.createApplication.parse}
         accessibilityLabel={t.createApplication.parseA11y}
         testID={TEST_IDS.parseButton}
@@ -282,6 +284,7 @@ export function CreateApplicationScreen({
     <Footer>
       <Button
         variant="secondary"
+        size="large"
         label={t.createApplication.addItem}
         accessibilityLabel={t.createApplication.addItemA11y}
         testID={TEST_IDS.addItemButton}
@@ -328,7 +331,10 @@ export function CreateApplicationScreen({
         </FormError>
       ) : null}
 
-      <Button
+      {/* Как «Собрать пакет»: главное действие экрана (решено
+          2026-10-02). */}
+      <GradientButton
+        accent="sky"
         label={isSaving ? t.common.saving : t.createApplication.save}
         accessibilityLabel={t.createApplication.saveA11y}
         testID={TEST_IDS.saveButton}

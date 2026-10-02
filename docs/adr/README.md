@@ -22,8 +22,8 @@ ADR — с контекстом, отвергнутыми альтернатив
 | [0013](./0013-detach-deletes-document-in-phase-1.md) | Открепление файла в Фазе 1 — полное удаление документа, а не снятие связи | Accepted; поведение снято 2026-09-20, см. «Обновление» в ADR |
 | [0014](./0014-react-navigation-native-stack.md) | Навигация — React Navigation (native-stack) | Accepted; структура дополнена ADR-0022 |
 | [0015](./0015-multiple-applications-last-opened.md) | Несколько заявок; активная — последняя открытая | Accepted |
-| [0016](./0016-application-deletion-keeps-documents.md) | Удаление заявки не трогает документы (заменяет разделы 2-3 ADR-0012) | Accepted |
-| [0017](./0017-document-library-screen.md) | Экран библиотеки документов: переиспользование файлов и удаление с устройства | Accepted |
+| [0016](./0016-application-deletion-keeps-documents.md) | Удаление заявки не трогает документы (заменяет разделы 2-3 ADR-0012) | Accepted; с 2026-10-02 удаление только с экрана заявки, см. «Обновление» в ADR |
+| [0017](./0017-document-library-screen.md) | Экран библиотеки документов: переиспользование файлов и удаление с устройства | Accepted; с 2026-10-02 превью по миниатюрам, см. «Обновление» в ADR |
 | [0018](./0018-deduplicate-documents-by-content-hash.md) | Дедупликация документов по SHA-256 содержимого | Accepted |
 | [0019](./0019-pdf-package-assembly.md) | Сборка финального PDF-пакета: реестр, сжатие снимков, share sheet | Accepted |
 | [0020](./0020-package-file-types-limited-to-images-and-pdf.md) | В пакет попадают только JPEG, PNG и PDF; конвертация docx отвергнута | Accepted |

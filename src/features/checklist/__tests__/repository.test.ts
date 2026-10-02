@@ -312,8 +312,22 @@ describe('listChecklistItems', () => {
         { id: 'i2', label: 'Фото', position: 1, status: 'pending' },
       ],
       [
-        { checklist_item_id: 'i1', id: 'd1', original_filename: 'стр1.jpg' },
-        { checklist_item_id: 'i1', id: 'd2', original_filename: null },
+        {
+          checklist_item_id: 'i1',
+          id: 'd1',
+          original_filename: 'стр1.jpg',
+          mime_type: 'application/pdf',
+          size_bytes: 2048,
+          file_path: 'documents/d1',
+        },
+        {
+          checklist_item_id: 'i1',
+          id: 'd2',
+          original_filename: null,
+          mime_type: 'application/pdf',
+          size_bytes: 2048,
+          file_path: 'documents/d2',
+        },
       ],
     );
 
@@ -324,8 +338,20 @@ describe('listChecklistItems', () => {
         position: 0,
         status: 'attached',
         documents: [
-          { id: 'd1', name: 'стр1.jpg' },
-          { id: 'd2', name: null },
+          {
+            id: 'd1',
+            name: 'стр1.jpg',
+            mimeType: 'application/pdf',
+            sizeBytes: 2048,
+            filePath: 'documents/d1',
+          },
+          {
+            id: 'd2',
+            name: null,
+            mimeType: 'application/pdf',
+            sizeBytes: 2048,
+            filePath: 'documents/d2',
+          },
         ],
       },
       {
@@ -376,6 +402,7 @@ describe('attachDocumentToItem', () => {
     mimeType: 'application/pdf',
     sizeBytes: 2048,
     contentHash: 'a'.repeat(64),
+    thumbnail: new Uint8Array([0xff, 0xd8]),
   };
 
   /**
@@ -389,7 +416,13 @@ describe('attachDocumentToItem', () => {
   }) {
     const stored =
       options.storedRow === undefined
-        ? { id: 'doc-1', original_filename: 'Паспорт.pdf' }
+        ? {
+            id: 'doc-1',
+            original_filename: 'Паспорт.pdf',
+            mime_type: 'application/pdf',
+            size_bytes: 2048,
+            file_path: 'documents/doc-1',
+          }
         : options.storedRow;
 
     const tx = {
@@ -416,14 +449,20 @@ describe('attachDocumentToItem', () => {
 
     await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
       status: 'created',
-      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+      document: {
+        id: 'doc-1',
+        name: 'Паспорт.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+        filePath: 'documents/doc-1',
+      },
     });
 
     expect(client.withTransaction).toHaveBeenCalledTimes(1);
     const calls = tx.execute.mock.calls;
     expect(calls.map(([sql]) => sql.split(' ').slice(0, 4).join(' '))).toEqual([
       'INSERT OR IGNORE INTO',
-      'SELECT id, original_filename FROM',
+      'SELECT id, original_filename, mime_type,',
       'SELECT 1 FROM checklist_item_documents',
       'INSERT INTO checklist_item_documents (checklist_item_id,',
       'UPDATE checklist_items SET status',
@@ -435,6 +474,7 @@ describe('attachDocumentToItem', () => {
       'application/pdf',
       2048,
       'a'.repeat(64),
+      new Uint8Array([0xff, 0xd8]),
       expect.any(String),
       expect.any(String),
     ]);
@@ -448,12 +488,24 @@ describe('attachDocumentToItem', () => {
     // Документ с таким содержимым успели записать между проверкой и
     // транзакцией: в базе он, а не наш (ADR-0018).
     const tx = mockAttachTransaction({
-      storedRow: { id: 'doc-0', original_filename: 'Паспорт (старый).pdf' },
+      storedRow: {
+        id: 'doc-0',
+        original_filename: 'Паспорт (старый).pdf',
+        mime_type: 'application/pdf',
+        size_bytes: 2048,
+        file_path: 'documents/doc-0',
+      },
     });
 
     await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
       status: 'reused',
-      document: { id: 'doc-0', name: 'Паспорт (старый).pdf' },
+      document: {
+        id: 'doc-0',
+        name: 'Паспорт (старый).pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+        filePath: 'documents/doc-0',
+      },
     });
 
     // Связь создаётся с найденным документом, а не с нашим id.
@@ -468,7 +520,13 @@ describe('attachDocumentToItem', () => {
 
     await expect(attachDocumentToItem(ATTACHMENT)).resolves.toEqual({
       status: 'already-attached',
-      document: { id: 'doc-1', name: 'Паспорт.pdf' },
+      document: {
+        id: 'doc-1',
+        name: 'Паспорт.pdf',
+        mimeType: 'application/pdf',
+        sizeBytes: 2048,
+        filePath: 'documents/doc-1',
+      },
     });
 
     expect(

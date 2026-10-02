@@ -8,6 +8,14 @@ import type { PressableProps, StyleProp, ViewStyle } from 'react-native';
  */
 export type ButtonVariant = 'primary' | 'secondary' | 'danger';
 
+/**
+ * Размер кнопки:
+ * - `regular` — обычная, в строках карточек и списков;
+ * - `large` — высотой с `GradientButton`, для действий рядом с ним
+ *   («Отправить ещё раз» под «Собрать пакет»).
+ */
+export type ButtonSize = 'regular' | 'large';
+
 export type ButtonProps = Omit<
   PressableProps,
   'accessibilityLabel' | 'accessibilityRole' | 'children' | 'style' | 'testID'
@@ -23,6 +31,8 @@ export type ButtonProps = Omit<
   testID: string;
   /** По умолчанию `primary`. */
   variant?: ButtonVariant;
+  /** По умолчанию `regular`. */
+  size?: ButtonSize;
   style?: StyleProp<ViewStyle>;
 };
 
@@ -30,9 +40,11 @@ export type ButtonProps = Omit<
 export type ContainerStyleProps = {
   $disabled: boolean;
   $variant: ButtonVariant;
+  $size: ButtonSize;
 };
 
 /** Пропсы оформления надписи, см. `styles.ts`. */
 export type LabelStyleProps = {
   $variant: ButtonVariant;
+  $size: ButtonSize;
 };

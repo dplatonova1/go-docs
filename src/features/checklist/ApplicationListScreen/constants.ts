@@ -1,8 +1,6 @@
-import type { DeleteState, ListState } from './types';
+import type { ListState } from './types';
 
 export const LOADING: ListState = { status: 'loading' };
-
-export const DELETE_IDLE: DeleteState = { status: 'idle' };
 
 /** Отступ кнопки создания от списка над ней. */
 export const CREATE_BUTTON_GAP = 4;
@@ -17,6 +15,5 @@ export const TEST_IDS = {
   createButton: 'create-application-button',
   libraryButton: 'open-document-library-button',
   settingsButton: 'open-settings-button',
-  deleteError: 'application-delete-error',
   empty: 'application-list-empty',
 } as const;

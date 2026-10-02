@@ -10,7 +10,11 @@
  * - целевой файл появляется только после успешного `save()`.
  */
 
-import type { ApplicationId, ChecklistItemId, DocumentId } from '../../checklist/model';
+import type {
+  ApplicationId,
+  ChecklistItemId,
+  DocumentId,
+} from '../../checklist/model';
 import { buildPackage } from '../buildPackage';
 import { isPackageAssemblyError } from '../errors';
 import { planPackage } from '../plan';
@@ -100,7 +104,11 @@ function document(id: string, mimeType: string | null) {
   };
 }
 
-function entry(id: string, label: string, documents: ReturnType<typeof document>[]) {
+function entry(
+  id: string,
+  label: string,
+  documents: ReturnType<typeof document>[],
+) {
   return {
     itemId: id as ChecklistItemId,
     label,
@@ -157,7 +165,9 @@ it('место проверяется до того, как прочитан п�
 
   await buildPackage(APPLICATION, plan, () => {});
 
-  expect(log.indexOf('check-space')).toBeLessThan(log.indexOf('read documents/d1'));
+  expect(log.indexOf('check-space')).toBeLessThan(
+    log.indexOf('read documents/d1'),
+  );
   expect(fs.assertEnoughSpace).toHaveBeenCalledWith(plan.estimatedBytes);
 });
 

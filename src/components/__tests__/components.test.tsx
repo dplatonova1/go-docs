@@ -19,7 +19,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AppThemeProvider } from '../../theme/ThemeProvider';
 import { Button } from '../Button';
 import { IconButton } from '../IconButton';
-import { PlusButton } from '../PlusButton';
+import { GradientButton } from '../GradientButton';
 import { ALL_EDGES, Screen } from '../Screen';
 import { TextField } from '../TextField';
 
@@ -133,6 +133,83 @@ describe('TextField', () => {
     expect(error.accessibilityRole).toBe('alert');
     expect(error.accessibilityLiveRegion).toBe('polite');
   });
+
+  /** Отдаёт полю размер и фокус так, как это сделала бы платформа. */
+  /**
+   * Фокусирует поле и отдаёт рамке размер, как это сделала бы платформа:
+   * рамка появляется только в фокусе и меряет себя сама.
+   */
+  function focusField(tree: ReactTestRenderer.ReactTestRenderer) {
+    // Последний — самый глубокий: у самого `TextField` те же `testID` и
+    // `onFocus`, но это обработчик экрана, а не поля.
+    const inputs = tree.root.findAll(
+      node =>
+        node.props.testID === 'passport' &&
+        typeof node.props.onFocus === 'function',
+    );
+    const input = inputs[inputs.length - 1]!;
+    ReactTestRenderer.act(() => {
+      input.props.onFocus({});
+    });
+    const rings = tree.root.findAll(
+      node => typeof node.props.onLayout === 'function',
+    );
+    ReactTestRenderer.act(() => {
+      for (const ring of rings) {
+        ring.props.onLayout({
+          nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 52 } },
+        });
+      }
+    });
+    return input;
+  }
+
+  function focusBorders(tree: ReactTestRenderer.ReactTestRenderer) {
+    return tree.root.findAll(
+      node =>
+        typeof node.props.stroke === 'string' &&
+        node.props.stroke.startsWith('url(#gradient-ring-'),
+    );
+  }
+
+  it('в фокусе рисует градиентную рамку и зовёт onFocus/onBlur экрана', () => {
+    const onFocus = jest.fn();
+    const onBlur = jest.fn();
+    const tree = render(
+      <TextField
+        label="Номер"
+        accessibilityLabel="Номер"
+        testID="passport"
+        onFocus={onFocus}
+        onBlur={onBlur}
+      />,
+    );
+
+    expect(focusBorders(tree)).toHaveLength(0);
+    const input = focusField(tree);
+    expect(focusBorders(tree).length).toBeGreaterThan(0);
+    expect(onFocus).toHaveBeenCalledTimes(1);
+
+    ReactTestRenderer.act(() => {
+      input.props.onBlur({});
+    });
+    expect(focusBorders(tree)).toHaveLength(0);
+    expect(onBlur).toHaveBeenCalledTimes(1);
+  });
+
+  it('при ошибке рамку фокуса не рисует: красная важнее', () => {
+    const tree = render(
+      <TextField
+        label="Номер"
+        accessibilityLabel="Номер"
+        testID="passport"
+        error="Неверный формат"
+      />,
+    );
+
+    focusField(tree);
+    expect(focusBorders(tree)).toHaveLength(0);
+  });
 });
 
 describe('IconButton', () => {
@@ -174,10 +251,13 @@ describe('IconButton', () => {
   });
 });
 
-describe('PlusButton', () => {
-  it('без видимой надписи озвучивается подписью и сообщает о недоступности', () => {
+describe('GradientButton', () => {
+  it('показывает надпись, озвучивается подписью и сообщает о недоступности', () => {
     const tree = render(
-      <PlusButton
+      <GradientButton
+        accent="sunset"
+        icon="add"
+        label="Создать заявку"
         accessibilityLabel="Создать новую заявку"
         testID="add"
         disabled
@@ -189,6 +269,9 @@ describe('PlusButton', () => {
     )[0]!;
     expect(button.props.accessibilityLabel).toBe('Создать новую заявку');
     expect(button.props.accessibilityState).toEqual({ disabled: true });
+    expect(
+      tree.root.findAllByProps({ children: 'Создать заявку' }).length,
+    ).toBeGreaterThan(0);
   });
 });
 

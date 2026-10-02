@@ -1,23 +1,18 @@
 import type { ViewStyle } from 'react-native';
-import { StyleSheet } from 'react-native';
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
-import { MIN_TOUCH_TARGET, RADII } from '../../../theme/metrics';
+import { MIN_TOUCH_TARGET } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 
-export const Card = styled.View`
-  gap: 8px;
-  padding: 12px;
-  border-radius: ${RADII.lg}px;
-  border-width: ${StyleSheet.hairlineWidth}px;
-  border-color: ${({ theme }) => theme.colors.divider};
-  background-color: ${({ theme }) => theme.colors.surface};
-`;
-
-/** Открытие заявки — вся область с названием, а не отдельная кнопка. */
+/**
+ * Открытие заявки — вся область с названием, а не отдельная кнопка.
+ * Справа по центру стрелка, как на референсе карточки (2026-10-02).
+ */
 export const OpenArea = styled.Pressable`
   min-height: ${MIN_TOUCH_TARGET}px;
-  justify-content: center;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
 `;
 
 /** См. `components/Button/styles.ts`: Pressable отдаёт нажатие колбэком. */
@@ -26,6 +21,9 @@ export const pressedStyle: ViewStyle = toStyleSheet(css`
 `);
 
 export const Title = styled.Text`
+  flex-grow: 1;
+  flex-shrink: 1;
+  flex-basis: 0;
   ${textSize(17)}
   font-family: ${FONTS.medium};
   color: ${({ theme }) => theme.colors.text};

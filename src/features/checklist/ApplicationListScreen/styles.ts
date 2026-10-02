@@ -1,26 +1,22 @@
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
+import { CARD_LIST_GAP } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 import { CREATE_BUTTON_GAP } from './constants';
 
 /** См. `CreateApplicationScreen/styles.ts`. */
 export const listContentStyle = toStyleSheet(css`
-  gap: 8px;
+  gap: ${CARD_LIST_GAP}px;
   padding-bottom: 24px;
 `);
 
 /**
- * Под списком, по центру: список сжимается над кнопкой, а не уходит под
+ * Под списком, во всю ширину: список сжимается над кнопкой, а не уходит под
  * неё, поэтому последняя строка всегда видна целиком.
  */
 export const CreateButtonSlot = styled.View`
-  align-items: center;
+  align-items: stretch;
   padding-top: ${CREATE_BUTTON_GAP}px;
-`;
-
-export const Footer = styled.View`
-  gap: 12px;
-  margin-top: 16px;
 `;
 
 export const Hint = styled.Text`

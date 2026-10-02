@@ -69,12 +69,12 @@ it('порядок каналов читается, а не угадываетс
 
   // Как RGBA это почти чёрная картинка с красным следом, как BGRA —
   // светлая синяя. Формат решает.
-  expect(assessQuality({ data, width: side, height: side, pixelFormat: 'RGBA' })).toBe(
-    'dark',
-  );
-  expect(assessQuality({ data, width: side, height: side, pixelFormat: 'BGRA' })).not.toBe(
-    'dark',
-  );
+  expect(
+    assessQuality({ data, width: side, height: side, pixelFormat: 'RGBA' }),
+  ).toBe('dark');
+  expect(
+    assessQuality({ data, width: side, height: side, pixelFormat: 'BGRA' }),
+  ).not.toBe('dark');
 });
 
 describe('фикстуры, похожие на настоящие снимки', () => {
@@ -111,7 +111,9 @@ describe('фикстуры, похожие на настоящие снимки'
   }
 
   it('резкий скан документа претензий не вызывает', () => {
-    expect(assessQuality(sample(documentPixels, 'RGBA', FIXTURE_SIDE))).toBeNull();
+    expect(
+      assessQuality(sample(documentPixels, 'RGBA', FIXTURE_SIDE)),
+    ).toBeNull();
   });
 
   it('заведомо смазанный скан помечается размытым', () => {

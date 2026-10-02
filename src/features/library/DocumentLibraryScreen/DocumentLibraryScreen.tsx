@@ -16,14 +16,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
-  ActivityIndicator,
   Alert,
   FlatList,
   type ListRenderItemInfo,
 } from 'react-native';
-import { useTheme } from 'styled-components/native';
 
 import { Screen } from '../../../components/Screen';
+import { GradientSpinner } from '../../../components/GradientSpinner';
 import { Button } from '../../../components/Button';
 import { translations, useTranslation } from '../../../i18n';
 import { libraryDocumentDeletionConfirmation } from '../../checklist/confirmations';
@@ -40,13 +39,7 @@ import {
 import { DocumentRow } from '../DocumentRow';
 import { deleteDocumentFromLibrary } from '../deleteDocumentFromLibrary';
 import { ACTION_IDLE, LOADING, TEST_IDS } from './constants';
-import {
-  ErrorText,
-  Header,
-  Hint,
-  Summary,
-  listContentStyle,
-} from './styles';
+import { ErrorText, Header, Hint, Summary, listContentStyle } from './styles';
 import type {
   ActionState,
   DocumentLibraryScreenProps,
@@ -59,7 +52,6 @@ export function DocumentLibraryScreen({
   onAttached,
 }: DocumentLibraryScreenProps) {
   const t = useTranslation();
-  const theme = useTheme();
   const mode = itemId === null ? 'browse' : 'pick';
   const [state, setState] = useState<ListState>(LOADING);
   const [attempt, setAttempt] = useState(0);
@@ -212,8 +204,7 @@ export function DocumentLibraryScreen({
         mode={mode}
         actionsDisabled={isBusy}
         isBusy={
-          actionState.status === 'working' &&
-          actionState.documentId === item.id
+          actionState.status === 'working' && actionState.documentId === item.id
         }
         onAttach={handleAttach}
         onDelete={handleDelete}
@@ -225,9 +216,7 @@ export function DocumentLibraryScreen({
   const header = (
     <Header>
       <Summary>
-        {mode === 'pick'
-          ? t.library.pickHint
-          : t.library.browseSummary(total)}
+        {mode === 'pick' ? t.library.pickHint : t.library.browseSummary(total)}
       </Summary>
 
       {actionState.status === 'failed' ? (
@@ -268,11 +257,12 @@ export function DocumentLibraryScreen({
   }
 
   return (
-    <Screen testID={TEST_IDS.screen}>
+    // Пока грузится — без прокрутки: лоадеру нужно растянуться на экран,
+    // чтобы встать по центру.
+    <Screen scrollable={state.status !== 'loading'} testID={TEST_IDS.screen}>
       {state.status === 'loading' ? (
-        <ActivityIndicator
-          size="large"
-          color={theme.colors.indicator}
+        <GradientSpinner
+          fill
           accessibilityLabel={t.library.loadingA11y}
           testID={TEST_IDS.loading}
         />
@@ -286,6 +276,7 @@ export function DocumentLibraryScreen({
             {state.message}
           </ErrorText>
           <Button
+            variant="secondary"
             label={t.common.retry}
             accessibilityLabel={t.library.retryA11y}
             testID={TEST_IDS.retryButton}

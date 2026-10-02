@@ -18,10 +18,11 @@ import {
 } from '@react-navigation/bottom-tabs';
 import { NavigationContainer } from '@react-navigation/native';
 import { useMemo } from 'react';
-import { ActivityIndicator, useColorScheme } from 'react-native';
+import { useColorScheme } from 'react-native';
 import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../components/Button';
+import { GradientSpinner } from '../../components/GradientSpinner';
 import { ALL_EDGES, Screen } from '../../components/Screen';
 import { useTranslation } from '../../i18n';
 import { TabBar } from '../TabBar';
@@ -64,11 +65,7 @@ export function RootNavigator() {
         // они обходят сами.
         <Screen scrollable={false} edges={ALL_EDGES} testID={TEST_IDS.loading}>
           <Centered>
-            <ActivityIndicator
-              size="large"
-              color={theme.colors.indicator}
-              accessibilityLabel={t.bootstrap.loadingA11y}
-            />
+            <GradientSpinner accessibilityLabel={t.bootstrap.loadingA11y} />
           </Centered>
         </Screen>
       );
@@ -81,6 +78,7 @@ export function RootNavigator() {
             {state.message}
           </Message>
           <Button
+            variant="secondary"
             label={t.common.retry}
             accessibilityLabel={t.bootstrap.retryA11y}
             testID={TEST_IDS.retryButton}

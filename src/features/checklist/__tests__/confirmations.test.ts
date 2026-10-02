@@ -1,9 +1,20 @@
-import type { DocumentId } from '../model';
+import type { AttachedDocument, DocumentId } from '../model';
 import {
   applicationDeletionConfirmation,
   documentDetachConfirmation,
   libraryDocumentDeletionConfirmation,
 } from '../confirmations';
+
+/** Прикреплённый документ для тестов: тип, размер и путь здесь не важны. */
+function attached(id: string, name: string | null): AttachedDocument {
+  return {
+    id: id as DocumentId,
+    name,
+    mimeType: 'application/pdf',
+    sizeBytes: 1024,
+    filePath: `documents/${id}`,
+  };
+}
 
 describe('applicationDeletionConfirmation', () => {
   it('без документов — только пункты и предупреждение о необратимости', () => {
@@ -43,7 +54,7 @@ describe('applicationDeletionConfirmation', () => {
 });
 
 describe('documentDetachConfirmation', () => {
-  const DOCUMENT = { id: 'd1' as DocumentId, name: 'Паспорт.pdf' };
+  const DOCUMENT = attached('d1', 'Паспорт.pdf');
 
   it('говорит об откреплении, а не об удалении файла', () => {
     const { title, message } = documentDetachConfirmation(
@@ -80,7 +91,7 @@ describe('documentDetachConfirmation', () => {
   it('файл без имени называется явно', () => {
     const { title } = documentDetachConfirmation(
       'Паспорт',
-      { id: 'd2' as DocumentId, name: null },
+      attached('d2', null),
       false,
     );
     expect(title).toBe('Открепить файл «без имени»?');

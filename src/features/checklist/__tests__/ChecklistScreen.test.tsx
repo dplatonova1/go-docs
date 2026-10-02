@@ -47,6 +47,14 @@ jest.mock('../attachDocument', () => ({
   pickAndAttachDocument: jest.fn(),
 }));
 
+// Превью прикреплённого файла в карточке пункта читает и расшифровывает
+// файл — нативные модули. Здесь превью не проверяется: у тестовых файлов
+// его нет, и в плитке заглушка.
+jest.mock('../../../storage/fs', () => ({
+  readFile: jest.fn(),
+  toRelativePath: (value: string) => value,
+}));
+
 const repository = require('../repository');
 const packageFeature = require('../../package');
 const attach = require('../attachDocument');

@@ -2,6 +2,7 @@
 export type IconName =
   | 'add'
   | 'back'
+  | 'chevronRight'
   | 'close'
   | 'home'
   | 'library'

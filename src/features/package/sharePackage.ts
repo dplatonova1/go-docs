@@ -15,9 +15,7 @@ import Share from 'react-native-share';
 
 import type { PackageBuildResult } from './types';
 
-export async function sharePackage(
-  result: PackageBuildResult,
-): Promise<void> {
+export async function sharePackage(result: PackageBuildResult): Promise<void> {
   await Share.open({
     url: `file://${result.filePath}`,
     type: 'application/pdf',

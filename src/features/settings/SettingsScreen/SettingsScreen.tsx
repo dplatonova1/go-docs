@@ -17,8 +17,11 @@
 
 import { useCallback, useState } from 'react';
 import { AccessibilityInfo } from 'react-native';
+import { useTheme } from 'styled-components/native';
 
+import { GradientRing } from '../../../components/GradientRing';
 import { Screen } from '../../../components/Screen';
+import { RADII } from '../../../theme/metrics';
 import {
   LOCALES,
   LOCALE_NAMES,
@@ -52,11 +55,13 @@ import {
   SectionTitle,
   SelectedMark,
   pressedStyle,
+  selectedOptionStyle,
 } from './styles';
 import type { SaveState } from './types';
 
 export function SettingsScreen() {
   const t = useTranslation();
+  const theme = useTheme();
   // Текущий язык — из стора, а не из состояния экрана: источник правды
   // один, и `useTranslation` уже перерисовывает экран при его смене.
   const locale = getLocale();
@@ -120,7 +125,6 @@ export function SettingsScreen() {
             return (
               <Option
                 key={option}
-                $selected={selected}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
                 accessibilityLabel={
@@ -129,9 +133,14 @@ export function SettingsScreen() {
                     : t.settings.languageA11y(name)
                 }
                 testID={`${LOCALE_TEST_ID_PREFIX}-${option}`}
-                style={({ pressed }) => (pressed ? pressedStyle : undefined)}
+                style={({ pressed }) => [
+                  selected ? theme.field.focused : theme.field.rest,
+                  selected && selectedOptionStyle,
+                  pressed && pressedStyle,
+                ]}
                 onPress={() => handleSelect(option)}
               >
+                {selected ? <GradientRing radius={RADII.field} /> : null}
                 <OptionLabel $selected={selected}>{name}</OptionLabel>
                 {selected ? (
                   <SelectedMark>{t.settings.selected}</SelectedMark>
@@ -166,7 +175,6 @@ export function SettingsScreen() {
             return (
               <Option
                 key={option}
-                $selected={selected}
                 accessibilityRole="radio"
                 accessibilityState={{ checked: selected }}
                 accessibilityLabel={
@@ -175,9 +183,14 @@ export function SettingsScreen() {
                     : t.settings.themeA11y(name)
                 }
                 testID={`${THEME_TEST_ID_PREFIX}-${option}`}
-                style={({ pressed }) => (pressed ? pressedStyle : undefined)}
+                style={({ pressed }) => [
+                  selected ? theme.field.focused : theme.field.rest,
+                  selected && selectedOptionStyle,
+                  pressed && pressedStyle,
+                ]}
                 onPress={() => handleSelectTheme(option)}
               >
+                {selected ? <GradientRing radius={RADII.field} /> : null}
                 <OptionLabel $selected={selected}>{name}</OptionLabel>
                 {selected ? (
                   <SelectedMark>{t.settings.themeSelected}</SelectedMark>

@@ -139,6 +139,26 @@ export const MIGRATIONS: readonly Migration[] = [
          ON documents(content_hash)`,
     ],
   },
+
+  {
+    version: 4,
+    name: 'document_thumbnail',
+    statements: [
+      // Миниатюра снимка для плитки превью — JPEG в несколько килобайт,
+      // сделанный один раз (`features/library/thumbnail.ts`). Раньше
+      // превью расшифровывало исходный файл целиком при каждом показе.
+      //
+      // В строке, а не файлом рядом с документом: зашифрована вместе с
+      // базой и удаляется вместе со строкой — ни второго файла на диске,
+      // ни его «сирот» при прерванной записи (ADR-0017, «Обновление»).
+      //
+      // NULL — миниатюры нет: PDF, сбой разбора или запись, созданная до
+      // этой миграции. Для старых записей миниатюра делается при первом
+      // показе: посчитать её здесь нельзя — файлы зашифрованы, ключ в
+      // Keychain.
+      `ALTER TABLE documents ADD COLUMN thumbnail BLOB`,
+    ],
+  },
 ];
 
 /**
@@ -160,17 +180,17 @@ export function selectPendingMigrations(
   all: readonly Migration[],
   appliedVersions: ReadonlySet<number>,
 ): readonly Migration[] {
-  const maxApplied = appliedVersions.size === 0
-    ? 0
-    : Math.max(...appliedVersions);
+  const maxApplied =
+    appliedVersions.size === 0 ? 0 : Math.max(...appliedVersions);
 
   const skipped = all.filter(
-    (migration) =>
-      migration.version <= maxApplied && !appliedVersions.has(migration.version),
+    migration =>
+      migration.version <= maxApplied &&
+      !appliedVersions.has(migration.version),
   );
 
   if (skipped.length > 0) {
-    const versions = skipped.map((migration) => migration.version).join(', ');
+    const versions = skipped.map(migration => migration.version).join(', ');
     throw new Error(
       `Миграции ${versions} не применены, хотя схема уже на версии ` +
         `${maxApplied}. Скорее всего, миграция с меньшим номером попала в ` +
@@ -179,6 +199,6 @@ export function selectPendingMigrations(
   }
 
   return [...all]
-    .filter((migration) => migration.version > maxApplied)
+    .filter(migration => migration.version > maxApplied)
     .sort((a, b) => a.version - b.version);
 }

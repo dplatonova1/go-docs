@@ -49,5 +49,6 @@ export const ScrollContainer = styled.ScrollView.attrs<ContentStyleProps>(
 
 export const StaticContent = styled.View<ContentStyleProps>`
   flex: 1;
+
   ${({ $flushBottom }) => ($flushBottom ? flushBottomCss : paddedCss)}
 `;

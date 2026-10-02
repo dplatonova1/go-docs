@@ -5,6 +5,9 @@
  * см. пояснение в [`Button.tsx`](../Button/Button.tsx). Пока действие
  * выполняется (`busy`), вместо иконки крутится спиннер того же цвета, а
  * скринридер получает состояние «занято».
+ *
+ * С `accent` кнопка — круг с заливкой из `theme.accents`, в стилистике
+ * `Button` (решено 2026-10-02): «Открепить» — как кнопки удаления.
  */
 
 import { ActivityIndicator } from 'react-native';
@@ -18,6 +21,7 @@ import type { IconButtonProps } from './types';
 export function IconButton({
   icon,
   color,
+  accent,
   accessibilityLabel,
   testID,
   busy = false,
@@ -27,7 +31,10 @@ export function IconButton({
 }: IconButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled === true || busy;
-  const tint = theme.colors[color];
+  // Ровно одно из двух задано — это обещает тип `IconButtonLook`.
+  const fill = accent === undefined ? undefined : theme.accents[accent];
+  const tint =
+    fill !== undefined ? fill.foreground : theme.colors[color ?? 'text'];
 
   return (
     <Container
@@ -39,7 +46,8 @@ export function IconButton({
       // Во время работы кнопка не тускнеет: спиннер и так показывает, что
       // нажимать не нужно, а бледный спиннер плохо видно.
       $disabled={isDisabled && !busy}
-      style={({ pressed }) => (pressed ? pressedStyle : undefined)}
+      $filled={fill !== undefined}
+      style={({ pressed }) => [fill?.fill, pressed && pressedStyle]}
       {...rest}
     >
       {busy ? (

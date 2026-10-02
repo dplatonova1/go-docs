@@ -14,10 +14,9 @@
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
-import { ActivityIndicator } from 'react-native';
-import { useTheme } from 'styled-components/native';
 
 import { Button } from '../../components/Button';
+import { GradientSpinner } from '../../components/GradientSpinner';
 import { Screen } from '../../components/Screen';
 import { describeError } from '../../features/checklist/errorMessages';
 import { useTranslation } from '../../i18n';
@@ -51,7 +50,6 @@ export function ApplicationGate({
   children,
 }: ApplicationGateProps) {
   const t = useTranslation();
-  const theme = useTheme();
   // Типизированный хук: `popTo` есть у стека, а не у навигации вообще.
   const navigation =
     useNavigation<NativeStackNavigationProp<HomeStackParamList>>();
@@ -104,9 +102,7 @@ export function ApplicationGate({
       return (
         <Screen scrollable={false} testID={TEST_IDS.applicationLoading}>
           <Centered>
-            <ActivityIndicator
-              size="large"
-              color={theme.colors.indicator}
+            <GradientSpinner
               accessibilityLabel={t.applicationGate.loadingA11y}
             />
           </Centered>
@@ -120,6 +116,7 @@ export function ApplicationGate({
             {state.message}
           </Message>
           <Button
+            variant="secondary"
             label={t.common.retry}
             accessibilityLabel={t.applicationGate.retryA11y}
             testID={TEST_IDS.applicationRetryButton}

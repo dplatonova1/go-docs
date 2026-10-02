@@ -33,14 +33,23 @@ jest.mock('../../checklist/repository', () => ({
   listLibraryDocuments: jest.fn(),
   getDocumentUsage: jest.fn(),
   attachLibraryDocumentToItem: jest.fn(),
+  getDocumentThumbnail: jest.fn(),
+  saveDocumentThumbnail: jest.fn(),
+}));
+
+// Миниатюру делает нативный модуль; здесь важно, что хук делает с
+// результатом, а не сама картинка.
+jest.mock('../thumbnail', () => ({
+  ...jest.requireActual('../thumbnail'),
+  makeThumbnail: jest.fn(),
 }));
 
 jest.mock('../deleteDocumentFromLibrary', () => ({
   deleteDocumentFromLibrary: jest.fn(),
 }));
 
-// Превью читает и расшифровывает файл — нативные модули. Сам хук
-// проверяется через состояние строки, а не через настоящий файл.
+// Старым записям без миниатюры превью делается из файла — его чтение и
+// расшифровка нативные. Хук проверяется через состояние строки.
 jest.mock('../../../storage/fs', () => ({
   readFile: jest.fn(),
   toRelativePath: (value: string) => value,
@@ -49,6 +58,7 @@ jest.mock('../../../storage/fs', () => ({
 const repository = require('../../checklist/repository');
 const remove = require('../deleteDocumentFromLibrary');
 const fs = require('../../../storage/fs');
+const { makeThumbnail } = require('../thumbnail');
 
 const ITEM_ID = 'item-1' as ChecklistItemId;
 
@@ -84,7 +94,11 @@ beforeEach(() => {
   });
   repository.attachLibraryDocumentToItem.mockResolvedValue('attached');
   remove.deleteDocumentFromLibrary.mockResolvedValue(undefined);
-  fs.readFile.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  fs.readFile.mockResolvedValue(new Uint8Array([9, 9, 9]));
+  // По умолчанию миниатюра уже в базе (сделана при прикреплении).
+  repository.getDocumentThumbnail.mockResolvedValue(new Uint8Array([1, 2, 3]));
+  repository.saveDocumentThumbnail.mockResolvedValue(undefined);
+  makeThumbnail.mockResolvedValue(new Uint8Array([4, 5, 6]));
   jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
@@ -96,11 +110,7 @@ afterEach(() => {
 async function renderScreen(itemId: ChecklistItemId | null) {
   const onAttached = jest.fn();
   const tree = await render(
-    <DocumentLibraryScreen
-      itemId={itemId}
-      isFocused
-      onAttached={onAttached}
-    />,
+    <DocumentLibraryScreen itemId={itemId} isFocused onAttached={onAttached} />,
   );
   await flush();
   return { tree, onAttached };
@@ -130,26 +140,47 @@ describe('просмотр библиотеки', () => {
         'Фото.jpg',
       ]),
     );
-    expect(findByTestId(tree, 'library-document-0-name').props.accessibilityLabel).toBe(
-      'Документ 1 из 2: Паспорт.pdf, добавлен 12 марта 2026',
-    );
+    expect(
+      findByTestId(tree, 'library-document-0-name').props.accessibilityLabel,
+    ).toBe('Документ 1 из 2: Паспорт.pdf, добавлен 12 марта 2026');
   });
 
-  it('превью — только у изображений, у остальных заглушка', async () => {
+  it('превью — миниатюра из базы, исходный файл не читается', async () => {
     const { tree } = await renderScreen(null);
 
-    // PDF: превью не делается вовсе, файл даже не читается.
+    // PDF: миниатюры не бывает, в базу за ней даже не ходим.
     expect(exists(tree, 'library-document-0-preview')).toBe(false);
     expect(exists(tree, 'library-document-0-preview-placeholder')).toBe(true);
+    expect(repository.getDocumentThumbnail).not.toHaveBeenCalledWith('doc-1');
 
-    // JPEG: файл расшифрован и показан как data-URI.
+    // JPEG: миниатюра из базы как data-URI, файл не расшифровывается.
+    expect(
+      findByTestId(tree, 'library-document-1-preview').props.source,
+    ).toEqual({ uri: 'data:image/jpeg;base64,AQID' });
+    expect(fs.readFile).not.toHaveBeenCalled();
+  });
+
+  it('у старой записи без миниатюры она делается из файла один раз и сохраняется', async () => {
+    repository.getDocumentThumbnail.mockResolvedValue(null);
+
+    const { tree } = await renderScreen(null);
+
     expect(fs.readFile).toHaveBeenCalledWith('documents/doc-2');
-    expect(findByTestId(tree, 'library-document-1-preview').props.source).toEqual(
-      { uri: 'data:image/jpeg;base64,AQID' },
+    expect(makeThumbnail).toHaveBeenCalledWith(
+      new Uint8Array([9, 9, 9]),
+      'image/jpeg',
     );
+    expect(repository.saveDocumentThumbnail).toHaveBeenCalledWith(
+      'doc-2',
+      new Uint8Array([4, 5, 6]),
+    );
+    expect(
+      findByTestId(tree, 'library-document-1-preview').props.source,
+    ).toEqual({ uri: 'data:image/jpeg;base64,BAUG' });
   });
 
   it('файл не читается — строка остаётся, на месте превью заглушка', async () => {
+    repository.getDocumentThumbnail.mockResolvedValue(null);
     fs.readFile.mockRejectedValue(
       new StorageError(StorageErrorCode.FileNotFound, 'нет файла'),
     );
@@ -297,7 +328,9 @@ describe('выбор файла для пункта', () => {
   });
 
   it('гонка: документ успели прикрепить — сообщение, а не тихий успех', async () => {
-    repository.attachLibraryDocumentToItem.mockResolvedValue('already-attached');
+    repository.attachLibraryDocumentToItem.mockResolvedValue(
+      'already-attached',
+    );
     const { tree, onAttached } = await renderScreen(ITEM_ID);
 
     await press(tree, 'library-document-0-attach');

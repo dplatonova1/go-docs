@@ -97,6 +97,11 @@ export type AttachedDocument = {
   readonly id: DocumentId;
   /** Имя файла в источнике. `null`, если источник его не сообщил. */
   readonly name: string | null;
+  readonly mimeType: string | null;
+  /** Размер исходного файла. `null` у записей, созданных до Фазы 1. */
+  readonly sizeBytes: number | null;
+  /** Относительный путь зашифрованного файла — нужен для превью. */
+  readonly filePath: string;
 };
 
 export type ChecklistItem = {
@@ -188,6 +193,11 @@ export type NewDocumentAttachment = {
   readonly sizeBytes: number;
   /** SHA-256 незашифрованного содержимого — ключ дедупликации. */
   readonly contentHash: string;
+  /**
+   * JPEG-миниатюра для плитки превью или `null` — PDF или сбой разбора
+   * (`features/library/thumbnail.ts`).
+   */
+  readonly thumbnail: Uint8Array | null;
 };
 
 /**

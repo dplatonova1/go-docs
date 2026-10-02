@@ -1,17 +1,15 @@
 /**
- * Экран списка заявок: открыть, переименовать, удалить, создать.
+ * Экран списка заявок: открыть, переименовать, создать.
  *
  * Порядок строк задаёт репозиторий (недавно открытые сверху) — экран его
  * не пересортировывает, иначе «последняя открытая» из ADR-0015
  * разъехалась бы между списком и запуском.
  *
- * Удаление проверяется целиком по цепочке «подсчёт → диалог →
- * подтверждение»: оно необратимо, и диалог пропустить нельзя.
+ * Удаления в списке нет (решено 2026-10-02) — оно на экране чек-листа,
+ * и проверяется там.
  */
 
 import React from 'react';
-import { Alert, type AlertButton } from 'react-native';
-import ReactTestRenderer from 'react-test-renderer';
 
 import { StorageError, StorageErrorCode } from '../../../storage/errors';
 import {
@@ -34,8 +32,6 @@ jest.mock('react-native-safe-area-context', () => {
 
 jest.mock('../repository', () => ({
   listApplications: jest.fn(),
-  getApplicationDeletionImpact: jest.fn(),
-  deleteApplication: jest.fn(),
 }));
 
 const repository = require('../repository');
@@ -47,12 +43,6 @@ const APPLICATIONS = [
 
 beforeEach(() => {
   jest.resetAllMocks();
-  repository.getApplicationDeletionImpact.mockResolvedValue({
-    itemCount: 7,
-    documentCount: 2,
-  });
-  repository.deleteApplication.mockResolvedValue(undefined);
-  jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 });
 
 afterEach(() => {
@@ -88,19 +78,6 @@ async function renderScreen({
     onRename,
     onCreate,
   };
-}
-
-function lastAlertButtons(): AlertButton[] {
-  const calls = (Alert.alert as jest.Mock).mock.calls;
-  return (calls[calls.length - 1]?.[2] ?? []) as AlertButton[];
-}
-
-async function confirmDelete() {
-  const confirm = lastAlertButtons().find(b => b.style === 'destructive');
-  await ReactTestRenderer.act(async () => {
-    confirm?.onPress?.();
-  });
-  await flush();
 }
 
 describe('список', () => {
@@ -205,108 +182,12 @@ describe('переименование', () => {
 });
 
 describe('удаление', () => {
-  beforeEach(() => {
+  it('в списке кнопки удаления нет — заявку удаляют с её экрана', async () => {
     repository.listApplications.mockResolvedValue(APPLICATIONS);
-  });
 
-  it('у каждой заявки своя кнопка с названием в подписи', async () => {
     const { tree } = await renderScreen();
 
-    const button = findByTestId(tree, 'application-row-1-delete');
-    expect(button.props.accessibilityLabel).toBe('Удалить заявку ВНЖ Сербия');
-    expect(button.props.label).toBe('Удалить');
-  });
-
-  it('сначала диалог с числами — и ничего не удаляет', async () => {
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-
-    expect(repository.getApplicationDeletionImpact).toHaveBeenCalledWith(
-      'app-2',
-    );
-    const [title, message] = (Alert.alert as jest.Mock).mock.calls[0] ?? [];
-    expect(title).toBe('Удалить заявку «ПМЖ Сербия»?');
-    expect(message).toContain('пункты чек-листа этой заявки (7)');
-    expect(message).toContain('документы (2) останутся');
-    expect(lastAlertButtons()[0]?.style).toBe('cancel');
-    expect(repository.deleteApplication).not.toHaveBeenCalled();
-  });
-
-  it('после подтверждения строка пропадает, остальные остаются', async () => {
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-    await confirmDelete();
-
-    expect(repository.deleteApplication).toHaveBeenCalledWith('app-2');
-    expect(texts(tree)).not.toContain('ПМЖ Сербия');
-    expect(texts(tree)).toEqual(expect.arrayContaining(['ВНЖ Сербия']));
-  });
-
-  it('отмена в диалоге ничего не удаляет', async () => {
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-
-    expect(repository.deleteApplication).not.toHaveBeenCalled();
-    expect(texts(tree)).toEqual(expect.arrayContaining(['ПМЖ Сербия']));
-  });
-
-  it('ошибка удаления показывается, заявка остаётся в списке', async () => {
-    repository.deleteApplication.mockRejectedValue(
-      new StorageError(StorageErrorCode.DatabaseFailure, 'детали'),
-    );
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-    await confirmDelete();
-
-    expect(exists(tree, 'application-delete-error')).toBe(true);
-    expect(texts(tree)).not.toContain('детали');
-    expect(texts(tree)).toEqual(expect.arrayContaining(['ПМЖ Сербия']));
-  });
-
-  it('не удалось подсчитать — сообщение, диалога нет', async () => {
-    repository.getApplicationDeletionImpact.mockRejectedValue(
-      new StorageError(StorageErrorCode.DatabaseFailure, 'детали'),
-    );
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-
-    expect(Alert.alert).not.toHaveBeenCalled();
-    expect(exists(tree, 'application-delete-error')).toBe(true);
-  });
-
-  it('пока идёт удаление, остальные действия недоступны', async () => {
-    let finish: (value: unknown) => void = () => {};
-    repository.deleteApplication.mockImplementation(
-      () => new Promise(resolve => (finish = resolve)),
-    );
-    const { tree } = await renderScreen();
-
-    await press(tree, 'application-row-0-delete');
-    const confirm = lastAlertButtons().find(b => b.style === 'destructive');
-    await ReactTestRenderer.act(async () => {
-      confirm?.onPress?.();
-      confirm?.onPress?.();
-    });
-
-    expect(repository.deleteApplication).toHaveBeenCalledTimes(1);
-    expect(findByTestId(tree, 'application-row-0-delete').props.label).toBe(
-      'Удаление…',
-    );
-    expect(findByTestId(tree, 'application-row-1-rename').props.disabled).toBe(
-      true,
-    );
-    expect(findByTestId(tree, 'create-application-button').props.disabled).toBe(
-      true,
-    );
-
-    await ReactTestRenderer.act(async () => {
-      finish(undefined);
-    });
-    await flush();
+    expect(exists(tree, 'application-row-0-delete')).toBe(false);
+    expect(exists(tree, 'application-row-1-delete')).toBe(false);
   });
 });

@@ -1,7 +1,12 @@
 /**
- * Пункт сохранённого чек-листа: текст, статус «прикреплено / не
- * прикреплено», прикреплённые файлы с кнопкой-иконкой открепления и кнопка
- * прикрепления.
+ * Пункт сохранённого чек-листа — карточка с картинкой: превью
+ * прикреплённого файла в плитке слева, текст, статус «прикреплено / не
+ * прикреплено», файлы с кнопкой-иконкой открепления; кнопки прикрепления —
+ * под разделителем.
+ *
+ * В плитке — первый файл, у которого есть превью; если превью нет ни у
+ * одного — заглушка первого файла, без файлов — «Нет файла»
+ * ([`DocumentPreviewTile`](../../library/DocumentPreviewTile)).
  *
  * Элементы озвучиваются по отдельности, а не одной группой: внутри
  * `accessible`-контейнера скринридер не дал бы нажать кнопку.
@@ -14,12 +19,14 @@
 import { memo, useCallback } from 'react';
 
 import { Button } from '../../../components/Button';
+import { Card } from '../../../components/Card';
 import { IconButton } from '../../../components/IconButton';
 import { useTranslation } from '../../../i18n';
+import { DocumentPreviewTile } from '../../library/DocumentPreviewTile';
+import { isPreviewable } from '../../library/useDocumentPreview';
 import { isAttached, type AttachedDocument } from '../model';
 import { TEST_ID_PREFIX } from './constants';
 import {
-  Container,
   ErrorText,
   FileName,
   FileRow,
@@ -47,6 +54,8 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   const number = index + 1;
   const testID = `${TEST_ID_PREFIX}-${index}`;
   const attached = isAttached(item);
+  const previewDocument =
+    item.documents.find(isPreviewable) ?? item.documents[0] ?? null;
   const statusText = attached
     ? t.checklistItem.statusAttached
     : t.checklistItem.statusNotAttached;
@@ -74,7 +83,34 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   }
 
   return (
-    <Container testID={testID}>
+    <Card
+      testID={testID}
+      media={<DocumentPreviewTile document={previewDocument} testID={testID} />}
+      footer={
+        <>
+          <Button
+            variant="secondary"
+            label={attachLabel}
+            accessibilityLabel={t.checklistItem.attachA11y(number, item.label)}
+            testID={`${testID}-attach`}
+            disabled={actionsDisabled}
+            onPress={handleAttach}
+          />
+
+          <Button
+            variant="secondary"
+            label={t.checklistItem.pickFromLibrary}
+            accessibilityLabel={t.checklistItem.pickFromLibraryA11y(
+              number,
+              item.label,
+            )}
+            testID={`${testID}-pick-from-library`}
+            disabled={actionsDisabled}
+            onPress={handlePickFromLibrary}
+          />
+        </>
+      }
+    >
       <Label
         accessibilityLabel={t.checklistItem.labelA11y(
           number,
@@ -114,9 +150,11 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
               {name}
             </FileName>
 
+            {/* Иконка в стилистике кнопок удаления: круг с заливкой
+                `rose` (решено 2026-10-02). */}
             <IconButton
               icon="close"
-              color="danger"
+              accent="rose"
               busy={isDetaching}
               // Вслух — что именно открепляется: иконка без имени файла в
               // списке из нескольких ничего не говорит.
@@ -151,27 +189,6 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
           {actionNotice}
         </NoticeText>
       ) : null}
-
-      <Button
-        variant="secondary"
-        label={attachLabel}
-        accessibilityLabel={t.checklistItem.attachA11y(number, item.label)}
-        testID={`${testID}-attach`}
-        disabled={actionsDisabled}
-        onPress={handleAttach}
-      />
-
-      <Button
-        variant="secondary"
-        label={t.checklistItem.pickFromLibrary}
-        accessibilityLabel={t.checklistItem.pickFromLibraryA11y(
-          number,
-          item.label,
-        )}
-        testID={`${testID}-pick-from-library`}
-        disabled={actionsDisabled}
-        onPress={handlePickFromLibrary}
-      />
-    </Container>
+    </Card>
   );
 });

@@ -1,5 +1,6 @@
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
+import { CARD_LIST_GAP } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 
 /**
@@ -7,7 +8,7 @@ import { FONTS, textSize } from '../../../theme/typography';
  * вместе с содержимым (см. `components/Screen/styles.ts`).
  */
 export const listContentStyle = toStyleSheet(css`
-  gap: 12px;
+  gap: ${CARD_LIST_GAP}px;
 `);
 
 export const Header = styled.View`
