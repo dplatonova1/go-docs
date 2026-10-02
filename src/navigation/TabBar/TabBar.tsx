@@ -19,7 +19,6 @@ import { useTheme } from 'styled-components/native';
 import { Icon } from '../../components/Icon';
 import { TAB_ICON_SIZE, TABS } from './constants';
 import {
-  Backdrop,
   Bar,
   IconBubble,
   Pill,
@@ -47,70 +46,68 @@ export function TabBar({
   }
 
   return (
-    <Backdrop>
-      <Bar accessibilityRole="tablist" $bottomInset={insets.bottom}>
-        <TabsRow onLayout={pill.onRowLayout}>
-          {pill.style === null ? null : (
-            <Pill
-              style={[theme.tabs.activeFill, pill.style]}
-              pointerEvents="none"
-            />
-          )}
+    <Bar accessibilityRole="tablist" $bottomInset={insets.bottom}>
+      <TabsRow onLayout={pill.onRowLayout}>
+        {pill.style === null ? null : (
+          <Pill
+            style={[theme.tabs.activeFill, pill.style]}
+            pointerEvents="none"
+          />
+        )}
 
-          {state.routes.map((route, index) => {
-            const name = route.name as TabName;
-            const { icon, testID } = TABS[name];
-            const label = descriptors[route.key]?.options.title ?? route.name;
-            const selected = state.index === index;
+        {state.routes.map((route, index) => {
+          const name = route.name as TabName;
+          const { icon, testID } = TABS[name];
+          const label = descriptors[route.key]?.options.title ?? route.name;
+          const selected = state.index === index;
 
-            const handlePress = () => {
-              const event = navigation.emit({
-                type: 'tabPress',
-                target: route.key,
-                canPreventDefault: true,
-              });
+          const handlePress = () => {
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
 
-              if (!selected && !event.defaultPrevented) {
-                navigation.navigate(route.name, route.params);
-              }
-            };
+            if (!selected && !event.defaultPrevented) {
+              navigation.navigate(route.name, route.params);
+            }
+          };
 
-            return (
-              <Tab
-                key={route.key}
-                accessibilityRole="tab"
-                accessibilityLabel={label}
-                accessibilityState={{ selected }}
-                testID={testID}
-                onPress={handlePress}
-              >
-                {/* `key` по состоянию: при переключении содержимое вкладки
+          return (
+            <Tab
+              key={route.key}
+              accessibilityRole="tab"
+              accessibilityLabel={label}
+              accessibilityState={{ selected }}
+              testID={testID}
+              onPress={handlePress}
+            >
+              {/* `key` по состоянию: при переключении содержимое вкладки
                   создаётся заново, а не перекрашивается. На Android
                   смена фона у существующего элемента (круг под иконкой)
                   теряла скругление: оно не менялось, и New Architecture
                   его повторно не присылала. */}
-                <TabBody
-                  key={selected ? 'selected' : 'idle'}
-                  onLayout={pill.onBodyLayout}
-                >
-                  <IconBubble $selected={selected}>
-                    <Icon
-                      name={icon}
-                      size={TAB_ICON_SIZE}
-                      color={
-                        selected
-                          ? theme.tabs.activeForeground
-                          : theme.tabs.inactiveForeground
-                      }
-                    />
-                  </IconBubble>
-                  <TabLabel $selected={selected}>{label}</TabLabel>
-                </TabBody>
-              </Tab>
-            );
-          })}
-        </TabsRow>
-      </Bar>
-    </Backdrop>
+              <TabBody
+                key={selected ? 'selected' : 'idle'}
+                onLayout={pill.onBodyLayout}
+              >
+                <IconBubble $selected={selected}>
+                  <Icon
+                    name={icon}
+                    size={TAB_ICON_SIZE}
+                    color={
+                      selected
+                        ? theme.tabs.activeForeground
+                        : theme.tabs.inactiveForeground
+                    }
+                  />
+                </IconBubble>
+                <TabLabel $selected={selected}>{label}</TabLabel>
+              </TabBody>
+            </Tab>
+          );
+        })}
+      </TabsRow>
+    </Bar>
   );
 }

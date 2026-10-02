@@ -31,6 +31,14 @@ export type ThemeColors = {
    * на `background`.
    */
   readonly surface: string;
+  /**
+   * `surface`, уже наложенный на `background`, — непрозрачный. Для
+   * нативных элементов, которые не должны просвечивать: у шапки стека
+   * Android сквозь полупрозрачный фон проступала её же тень — полосой в
+   * несколько пикселей (найдено 2026-10-03). Совпадение с наложением
+   * проверяет тест.
+   */
+  readonly surfaceOpaque: string;
   /** Основной текст. */
   readonly text: string;
   /** Второстепенный текст: пояснения, плейсхолдеры. */
@@ -76,27 +84,32 @@ export type ThemeColors = {
 export const lightColors: ThemeColors = {
   // Продублирован как фон окна Android до загрузки JS:
   // android/app/src/main/res/values/colors.xml. Менять вместе.
-  background: '#F4F6FA',
+  // Темнее прежнего #F4F6FA (решено 2026-10-03): карточки сливались с
+  // фоном.
+  background: '#EBEEF5',
   // Белый 58% поверх фона — с референса (решено 2026-10-01). На
-  // `background` даёт #FAFBFD.
+  // `background` даёт #F7F8FB.
   surface: 'rgba(255, 255, 255, 0.58)',
+  surfaceOpaque: '#F7F8FB',
   text: '#171717',
   // В теме `popover-foreground`. `muted-foreground` темы (#202020) почти
   // не отличается от основного текста и второстепенным не выглядит.
-  textSecondary: '#525252',
+  // Прежний #525252 на фоне #EBEEF5 (2026-10-03) — 6.7:1, затемнён.
+  textSecondary: '#4D4D4D',
   primary: '#96b3ff',
   onPrimary: '#1E2723',
   // Тёмный оттенок `primary` (#96b3ff даёт 2:1 к фону): 8.2:1.
   indicator: '#2645A8',
-  // В теме #DFDFDF — 1.3:1. Исходный цвет остался в `divider`. Прежний
-  // #929292 на фоне #F4F6FA (2026-10-01) дал 2.9:1 — затемнён.
-  border: '#8C8C8C',
+  // В теме #DFDFDF — 1.3:1. Исходный цвет остался в `divider`. Затемнялся
+  // вслед за фоном: #929292 → #8C8C8C (2026-10-01) → #858585 (фон
+  // #EBEEF5, 2026-10-03).
+  border: '#858585',
   divider: '#DFDFDF',
   attachedSurface: 'rgba(90, 130, 240, 0.12)',
   attachedBorder: 'rgba(90, 130, 240, 0.28)',
-  // В теме #CA3214 — 5.2:1 как текст. Прежний #A42910 на фоне #F4F6FA
-  // (2026-10-01) дал 6.7:1 — затемнён.
-  danger: '#98260F',
+  // В теме #CA3214 — 5.2:1 как текст. Затемнялся вслед за фоном:
+  // #A42910 → #98260F (2026-10-01) → #90240E (фон #EBEEF5, 2026-10-03).
+  danger: '#90240E',
 };
 
 export const darkColors: ThemeColors = {
@@ -105,6 +118,7 @@ export const darkColors: ThemeColors = {
   // Белый 7% поверх фона — с референса (решено 2026-10-01). На
   // `background` даёт #1C2130.
   surface: 'rgba(255, 255, 255, 0.07)',
+  surfaceOpaque: '#1C2130',
   text: '#E2E8F0',
   // Прежний #A2A2A2 на `surface` #1C2130 (2026-10-01) дал 6.3:1 —
   // осветлён.

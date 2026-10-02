@@ -58,7 +58,8 @@ export const Label = styled.Text<LabelStyleProps>`
   /* Без явного размера текст не масштабируется предсказуемо при
      увеличенном системном шрифте. */
   ${({ $size }) => textSize($size === 'large' ? 17 : 16)}
-  font-family: ${FONTS.semibold};
+  /* Обычное начертание, не жирное — решено 2026-10-03. */
+  font-family: ${FONTS.regular};
   text-align: center;
   color: ${({ theme, $variant }) => {
     const { accent, label } = VARIANT_COLORS[$variant];

@@ -69,8 +69,7 @@ export const pressedStyle: ViewStyle = toStyleSheet(css`
 
 export const OptionLabel = styled.Text<OptionStyleProps>`
   ${textSize(17)}
-  font-family: ${({ $selected }) =>
-    $selected ? FONTS.semibold : FONTS.regular};
+  font-family: ${FONTS.regular};
   color: ${({ theme }) => theme.colors.text};
 `;
 

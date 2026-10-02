@@ -81,6 +81,14 @@ describe.each<[string, ThemeColors]>([
     },
   );
 
+  it('surfaceOpaque — это surface, наложенный на background', () => {
+    // Шапка рисуется непрозрачным цветом, карточки — полупрозрачным;
+    // на экране они должны совпадать.
+    expect(colors.surfaceOpaque.toLowerCase()).toBe(
+      opaque(colors.surface, colors.background).toLowerCase(),
+    );
+  });
+
   it('onPrimary читается на primary с контрастом не меньше 7:1', () => {
     expect(contrast(colors.onPrimary, colors.primary)).toBeGreaterThanOrEqual(
       7,

@@ -1,11 +1,12 @@
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
-import { CARD_LIST_GAP } from '../../../theme/metrics';
+import { CARD_LIST_GAP, LIST_END_PADDING } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 
 /** См. `checklist/ChecklistScreen/styles.ts`. */
 export const listContentStyle = toStyleSheet(css`
   gap: ${CARD_LIST_GAP}px;
+  padding-bottom: ${LIST_END_PADDING}px;
 `);
 
 export const Header = styled.View`

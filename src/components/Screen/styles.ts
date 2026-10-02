@@ -1,6 +1,7 @@
 import { SafeAreaView } from 'react-native-safe-area-context';
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
+import { LIST_END_PADDING } from '../../theme/metrics';
 import type { ContentStyleProps } from './types';
 
 const paddedCss = css`
@@ -18,6 +19,17 @@ const flushBottomCss = css`
   gap: 12px;
 `;
 
+/**
+ * Прокручиваемый экран над панелью вкладок: в конце прокрутки последний
+ * элемент не упирается в панель. Отступ у содержимого, поэтому виден
+ * только в самом конце.
+ */
+const flushBottomScrollCss = css`
+  padding: 16px;
+  padding-bottom: ${LIST_END_PADDING}px;
+  gap: 12px;
+`;
+
 export const Root = styled(SafeAreaView)`
   flex: 1;
   /* Фон задаётся явно: фон окна Android в тёмной теме тёмно-серый и не
@@ -31,7 +43,7 @@ export const KeyboardAvoider = styled.KeyboardAvoidingView`
 
 // Готовые объекты, а не пересборка на каждый рендер.
 const PADDED_CONTENT = toStyleSheet(paddedCss);
-const FLUSH_BOTTOM_CONTENT = toStyleSheet(flushBottomCss);
+const FLUSH_BOTTOM_SCROLL_CONTENT = toStyleSheet(flushBottomScrollCss);
 
 /**
  * Отступы прокручиваемого экрана задаются через `contentContainerStyle`,
@@ -41,7 +53,9 @@ const FLUSH_BOTTOM_CONTENT = toStyleSheet(flushBottomCss);
  */
 export const ScrollContainer = styled.ScrollView.attrs<ContentStyleProps>(
   ({ $flushBottom }) => ({
-    contentContainerStyle: $flushBottom ? FLUSH_BOTTOM_CONTENT : PADDED_CONTENT,
+    contentContainerStyle: $flushBottom
+      ? FLUSH_BOTTOM_SCROLL_CONTENT
+      : PADDED_CONTENT,
   }),
 )`
   flex: 1;

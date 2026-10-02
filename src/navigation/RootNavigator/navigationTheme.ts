@@ -46,8 +46,9 @@ export function toNavigationTheme(
       // Навигация красит этим цветом элементы без заливки.
       primary: theme.colors.indicator,
       background: theme.colors.background,
-      // Шапка — поверхность над фоном экрана, как карточки.
-      card: theme.colors.surface,
+      // Шапка — поверхность над фоном экрана, как карточки, но
+      // непрозрачная: сквозь полупрозрачный фон проступала тень шапки.
+      card: theme.colors.surfaceOpaque,
       text: theme.colors.text,
       border: theme.colors.divider,
       notification: theme.colors.danger,
@@ -67,5 +68,8 @@ export function toStackScreenOptions(
   return {
     headerTintColor: theme.colors.text,
     headerLeft: renderHeaderBack,
+    // Без тени под шапкой: в плоском оформлении она лишняя, а на
+    // Android рисовалась полосой другого цвета (найдено 2026-10-03).
+    headerShadowVisible: false,
   };
 }

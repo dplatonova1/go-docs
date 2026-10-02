@@ -29,6 +29,7 @@ export const pressedStyle: ViewStyle = toStyleSheet(css`
 
 export const Label = styled.Text<LabelStyleProps>`
   ${textSize(17)}
-  font-family: ${FONTS.semibold};
+  /* Обычное начертание, не жирное — решено 2026-10-03. */
+  font-family: ${FONTS.regular};
   color: ${({ theme, $accent }) => theme.accents[$accent].foreground};
 `;

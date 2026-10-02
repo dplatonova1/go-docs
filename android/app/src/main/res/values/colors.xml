@@ -5,5 +5,5 @@
       Совпадает с `background` светлой палитры в src/theme/colors.ts —
       менять вместе, иначе при запуске будет вспышка другого цвета.
     -->
-    <color name="app_background">#F4F6FA</color>
+    <color name="app_background">#EBEEF5</color>
 </resources>

@@ -14,7 +14,11 @@ import { ActivityIndicator } from 'react-native';
 import { useTheme } from 'styled-components/native';
 
 import { Icon } from '../Icon';
-import { ICON_BUTTON_ICON_SIZE } from './constants';
+import {
+  FILLED_HIT_SLOP,
+  FILLED_ICON_SIZE,
+  ICON_BUTTON_ICON_SIZE,
+} from './constants';
 import { Container, pressedStyle } from './styles';
 import type { IconButtonProps } from './types';
 
@@ -25,12 +29,14 @@ export function IconButton({
   accessibilityLabel,
   testID,
   busy = false,
-  size = ICON_BUTTON_ICON_SIZE,
+  size,
   disabled,
   ...rest
 }: IconButtonProps) {
   const theme = useTheme();
   const isDisabled = disabled === true || busy;
+  const iconSize =
+    size ?? (accent === undefined ? ICON_BUTTON_ICON_SIZE : FILLED_ICON_SIZE);
   // Ровно одно из двух задано — это обещает тип `IconButtonLook`.
   const fill = accent === undefined ? undefined : theme.accents[accent];
   const tint =
@@ -47,13 +53,16 @@ export function IconButton({
       // нажимать не нужно, а бледный спиннер плохо видно.
       $disabled={isDisabled && !busy}
       $filled={fill !== undefined}
+      // Круг с заливкой меньше тач-таргета — зона касания добирается
+      // до прежних 44 точек.
+      hitSlop={fill !== undefined ? FILLED_HIT_SLOP : undefined}
       style={({ pressed }) => [fill?.fill, pressed && pressedStyle]}
       {...rest}
     >
       {busy ? (
         <ActivityIndicator size="small" color={tint} />
       ) : (
-        <Icon name={icon} size={size} color={tint} />
+        <Icon name={icon} size={iconSize} color={tint} />
       )}
     </Container>
   );

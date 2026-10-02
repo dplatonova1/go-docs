@@ -11,19 +11,10 @@ import {
 import type { BarStyleProps, TabStyleProps } from './types';
 
 /**
- * Непрозрачная подложка цвета `background` под панелью. `surface`
- * полупрозрачный (`theme/colors.ts`), а под панелью, в отличие от
- * шапки и карточек, нет экрана — только фон окна Android. Он задан
- * нативно и может не совпадать с темой приложения (другая сборка,
- * тема выбрана в настройках вопреки системной): так панель в светлой
- * теме выходила тёмно-серой.
- */
-export const Backdrop = styled.View`
-  background-color: ${({ theme }) => theme.colors.background};
-`;
-
-/**
- * Панель — поверхность, как шапка: цвет `surface`, сверху разделитель.
+ * Панель — поверхность, как шапка: непрозрачный `surfaceOpaque`, сверху
+ * разделитель. Непрозрачный, потому что под панелью нет экрана — только
+ * фон окна Android, заданный нативно и не всегда совпадающий с темой
+ * приложения; полупрозрачный `surface` выходил там тёмно-серым.
  */
 export const Bar = styled.View<BarStyleProps>`
   flex-direction: row;
@@ -32,7 +23,7 @@ export const Bar = styled.View<BarStyleProps>`
     $bottomInset + TAB_BAR_BOTTOM_PADDING}px;
   border-top-width: ${StyleSheet.hairlineWidth}px;
   border-top-color: ${({ theme }) => theme.colors.divider};
-  background-color: ${({ theme }) => theme.colors.surface};
+  background-color: ${({ theme }) => theme.colors.surfaceOpaque};
 `;
 
 /**
@@ -92,13 +83,13 @@ export const IconBubble = styled.View<TabStyleProps>`
 `;
 
 /**
- * Выбранная вкладка отличается формой (пилюля), цветом и полужирной
- * подписью: разницу одного цвета различают не все.
+ * Выбранная вкладка отличается формой (пилюля) и цветом: разницу одного
+ * цвета различают не все, а пилюлю видно и без цвета. Начертание у всех
+ * обычное — жирное убрано 2026-10-03.
  */
 export const TabLabel = styled.Text<TabStyleProps>`
   ${textSize(12)}
-  font-family: ${({ $selected }) =>
-    $selected ? FONTS.semibold : FONTS.regular};
+  font-family: ${FONTS.regular};
   color: ${({ theme, $selected }) =>
     $selected ? theme.tabs.activeForeground : theme.tabs.inactiveForeground};
 `;
