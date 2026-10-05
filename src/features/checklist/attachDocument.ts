@@ -41,7 +41,8 @@ import {
   type ChecklistItemId,
   type DocumentId,
 } from './model';
-import { makeThumbnail } from '../library/thumbnail';
+import { analyzeImage } from '../library/thumbnail';
+import { saveThumbnail } from '../library/thumbnailStore';
 import { pickDocument, type PickedDocument } from './pickDocument';
 import {
   attachDocumentToItem,
@@ -131,11 +132,12 @@ export async function attachPickedDocument(
   // на середине файла.
   await assertEnoughSpace(bytes.length);
 
-  // Миниатюра — пока байты уже в памяти: потом для неё пришлось бы
-  // расшифровывать файл целиком. Не получилась — документ всё равно
-  // прикрепляется, в плитке будет заглушка.
+  // Миниатюра и детектор качества — одним проходом, пока байты уже в
+  // памяти: потом для них пришлось бы расшифровывать файл целиком. Не
+  // получилось — документ всё равно прикрепляется: в плитке заглушка,
+  // пометки о качестве нет.
   const mimeType = sanitizeSourceText(picked.mimeType);
-  const thumbnail = await makeThumbnail(bytes, mimeType);
+  const { thumbnail, quality } = await analyzeImage(bytes, mimeType);
 
   let outcome;
   try {
@@ -148,7 +150,7 @@ export async function attachPickedDocument(
       mimeType,
       sizeBytes: bytes.length,
       contentHash,
-      thumbnail,
+      qualityFlag: quality,
     });
   } catch (error) {
     // Файл мог записаться целиком или частично, а строки для него нет.
@@ -157,6 +159,12 @@ export async function attachPickedDocument(
   }
 
   if (outcome.status === 'created') {
+    // Миниатюра — после записи документа в базу: прерванная запись
+    // оставит в худшем случае документ без миниатюры, и её сделает
+    // первый показ. Сбой записи миниатюры прикрепление не ломает.
+    if (thumbnail !== null) {
+      await saveThumbnail(id, thumbnail);
+    }
     return { status: 'attached', document: outcome.document };
   }
 

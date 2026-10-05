@@ -34,7 +34,11 @@ jest.mock('../pickDocument', () => ({ pickDocument: jest.fn() }));
 // Миниатюру делает нативный модуль; здесь проверяется, что она уходит в
 // запись документа.
 jest.mock('../../library/thumbnail', () => ({
-  makeThumbnail: jest.fn(),
+  analyzeImage: jest.fn(),
+}));
+
+jest.mock('../../library/thumbnailStore', () => ({
+  saveThumbnail: jest.fn(),
 }));
 
 jest.mock('../repository', () => ({
@@ -48,7 +52,8 @@ const fs = require('../../../storage/fs');
 const localCopy = require('../../../storage/localCopy');
 const { pickDocument } = require('../pickDocument');
 const repository = require('../repository');
-const { makeThumbnail } = require('../../library/thumbnail');
+const { analyzeImage } = require('../../library/thumbnail');
+const { saveThumbnail } = require('../../library/thumbnailStore');
 
 const THUMBNAIL = new Uint8Array([0xff, 0xd8, 0xff]);
 
@@ -68,7 +73,10 @@ beforeEach(() => {
   jest.resetAllMocks();
   log = [];
   ids.newId.mockReturnValue('doc-1');
-  makeThumbnail.mockResolvedValue(THUMBNAIL);
+  analyzeImage.mockResolvedValue({ thumbnail: THUMBNAIL, quality: 'dark' });
+  saveThumbnail.mockImplementation(async () => {
+    log.push('thumbnail');
+  });
   localCopy.readCachedCopy.mockImplementation(async () => {
     log.push('read-copy');
     return BYTES;
@@ -113,6 +121,7 @@ describe('новый файл', () => {
       'check-space',
       'write documents/doc-1',
       'db',
+      'thumbnail',
     ]);
     expect(fs.writeFile).toHaveBeenCalledWith('documents/doc-1', BYTES);
     expect(repository.attachDocumentToItem).toHaveBeenCalledWith({
@@ -123,11 +132,15 @@ describe('новый файл', () => {
       mimeType: 'application/pdf',
       sizeBytes: 4,
       contentHash: HASH,
-      thumbnail: THUMBNAIL,
+      // Пометка детектора — в базу (метаданные), миниатюра — файлом.
+      qualityFlag: 'dark',
     });
+    // В базу миниатюра не идёт — только метаданные; она пишется файлом
+    // после записи документа.
+    expect(saveThumbnail).toHaveBeenCalledWith('doc-1', THUMBNAIL);
     // Миниатюра — из тех же байтов, что пишутся на диск: файл второй раз
     // не читается.
-    expect(makeThumbnail).toHaveBeenCalledWith(BYTES, 'application/pdf');
+    expect(analyzeImage).toHaveBeenCalledWith(BYTES, 'application/pdf');
     expect(result).toEqual({
       status: 'attached',
       document: { id: 'doc-1', name: 'Паспорт.pdf' },

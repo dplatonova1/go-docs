@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useCallback, useEffect, useState, type ReactElement } from 'react';
 
 import { Button } from '../../components/Button';
+import { GradientButton } from '../../components/GradientButton';
 import { GradientSpinner } from '../../components/GradientSpinner';
 import { Screen } from '../../components/Screen';
 import { describeError } from '../../features/checklist/errorMessages';
@@ -131,7 +132,10 @@ export function ApplicationGate({
           <Message accessibilityRole="alert" accessibilityLiveRegion="polite">
             {t.applicationGate.missing}
           </Message>
-          <Button
+          {/* Как «Собрать пакет»: единственное действие экрана (решено
+              2026-10-05). */}
+          <GradientButton
+            accent="sky"
             label={t.applicationGate.backToList}
             accessibilityLabel={t.applicationGate.backToListA11y}
             testID={TEST_IDS.backToListButton}

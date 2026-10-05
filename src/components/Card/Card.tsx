@@ -18,8 +18,10 @@ import type { CardProps } from './types';
 
 export function Card({ children, media, footer, ...rest }: CardProps) {
   const theme = useTheme();
-  const hasMedia = media !== undefined && media !== null;
-  const hasFooter = footer !== undefined && footer !== null;
+  // `false` — тоже «нет»: так пишут `media={hasPreview && <Превью />}`,
+  // и при `false` пустой плитки быть не должно.
+  const hasMedia = media !== undefined && media !== null && media !== false;
+  const hasFooter = footer !== undefined && footer !== null && footer !== false;
 
   return (
     <Container style={theme.card.fill} {...rest}>

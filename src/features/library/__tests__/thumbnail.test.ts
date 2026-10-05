@@ -7,7 +7,7 @@
  * что сбой не превращается в исключение у вызывающего.
  */
 
-import { canHaveThumbnail, fitShortSide, makeThumbnail } from '../thumbnail';
+import { analyzeImage, canHaveThumbnail, fitShortSide } from '../thumbnail';
 
 describe('fitShortSide', () => {
   it('уменьшает так, что короткая сторона равна заданной', () => {
@@ -33,18 +33,18 @@ describe('canHaveThumbnail', () => {
   });
 });
 
-describe('makeThumbnail', () => {
-  it('для PDF не делает ничего и возвращает null', async () => {
+describe('analyzeImage', () => {
+  it('для PDF не делает ничего: ни миниатюры, ни пометки', async () => {
     await expect(
-      makeThumbnail(new Uint8Array([1]), 'application/pdf'),
-    ).resolves.toBeNull();
+      analyzeImage(new Uint8Array([1]), 'application/pdf'),
+    ).resolves.toEqual({ thumbnail: null, quality: null });
   });
 
-  it('сбой разбора картинки — null, а не исключение', async () => {
-    // Документ без миниатюры — просто документ с заглушкой в плитке:
-    // прикрепление из-за этого падать не должно.
+  it('сбой разбора картинки — пустой результат, а не исключение', async () => {
+    // Документ без миниатюры и пометки — просто документ с заглушкой в
+    // плитке: прикрепление из-за этого падать не должно.
     await expect(
-      makeThumbnail(new Uint8Array([1, 2, 3]), 'image/jpeg'),
-    ).resolves.toBeNull();
+      analyzeImage(new Uint8Array([1, 2, 3]), 'image/jpeg'),
+    ).resolves.toEqual({ thumbnail: null, quality: null });
   });
 });

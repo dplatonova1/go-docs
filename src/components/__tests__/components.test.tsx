@@ -12,13 +12,21 @@
 
 import React from 'react';
 import { BottomTabBarHeightContext } from '@react-navigation/bottom-tabs';
-import { ActivityIndicator, ScrollView, StyleSheet } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text } from 'react-native';
 import ReactTestRenderer from 'react-test-renderer';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { darkColors, lightColors } from '../../theme/colors';
+import { MIN_TOUCH_TARGET } from '../../theme/metrics';
 import { AppThemeProvider } from '../../theme/ThemeProvider';
 import { Button } from '../Button';
-import { IconButton } from '../IconButton';
+import { CARD_MEDIA_SIZE, Card } from '../Card';
+import { GradientSpinner } from '../GradientSpinner';
+import {
+  FILLED_HIT_SLOP,
+  FILLED_ICON_BUTTON_SIZE,
+  IconButton,
+} from '../IconButton';
 import { GradientButton } from '../GradientButton';
 import { ALL_EDGES, Screen } from '../Screen';
 import { TextField } from '../TextField';
@@ -322,5 +330,167 @@ describe('Screen', () => {
     );
 
     expect(resolvedProp(tree, 'screen', 'edges')).toContain('top');
+  });
+});
+
+/** Плоский стиль host-узла: у Pressable стиль приходит функцией или массивом. */
+function flatStyles(
+  tree: ReactTestRenderer.ReactTestRenderer,
+): Record<string, unknown>[] {
+  return tree.root
+    .findAll(node => typeof node.type === 'string')
+    .map(node => {
+      const raw = node.props.style;
+      const resolved =
+        typeof raw === 'function' ? raw({ pressed: false }) : raw;
+      return (StyleSheet.flatten(resolved) ?? {}) as Record<string, unknown>;
+    });
+}
+
+describe('Card', () => {
+  function mediaTiles(tree: ReactTestRenderer.ReactTestRenderer) {
+    return flatStyles(tree).filter(
+      style =>
+        style.width === CARD_MEDIA_SIZE && style.height === CARD_MEDIA_SIZE,
+    );
+  }
+
+  it('с картинкой и нижней строкой рисует плитку, содержимое и нижнюю строку', () => {
+    const tree = render(
+      <Card
+        testID="card"
+        media={<Text>картинка</Text>}
+        footer={<Text>низ</Text>}
+      >
+        <Text>содержимое</Text>
+      </Card>,
+    );
+
+    const shown = tree.root
+      .findAllByType(Text)
+      .map(node => node.props.children);
+    expect(shown).toEqual(
+      expect.arrayContaining(['картинка', 'содержимое', 'низ']),
+    );
+    expect(mediaTiles(tree)).toHaveLength(1);
+  });
+
+  it('media={false} — без пустой плитки: так пишут условный рендер', () => {
+    const hasPreview = false;
+    const tree = render(
+      <Card testID="card" media={hasPreview && <Text>картинка</Text>}>
+        <Text>содержимое</Text>
+      </Card>,
+    );
+
+    expect(mediaTiles(tree)).toHaveLength(0);
+  });
+});
+
+describe('GradientButton: заливка', () => {
+  function backgroundOf(accent: 'sky' | 'rose') {
+    const tree = render(
+      <GradientButton
+        accent={accent}
+        label="Собрать пакет"
+        accessibilityLabel="Собрать пакет"
+        testID="build"
+      />,
+    );
+    return flatStyles(tree).find(style => style.backgroundImage !== undefined)
+      ?.backgroundImage;
+  }
+
+  it('заливка — градиент выбранного акцента из темы', () => {
+    const sky = backgroundOf('sky');
+    const rose = backgroundOf('rose');
+
+    expect(String(sky)).toContain('linear-gradient');
+    expect(String(rose)).toContain('linear-gradient');
+    expect(sky).not.toEqual(rose);
+  });
+});
+
+describe('IconButton с заливкой', () => {
+  function buttonOf(tree: ReactTestRenderer.ReactTestRenderer) {
+    return tree.root.findAll(
+      node => node.props.testID === 'detach' && node.props.accessibilityRole,
+    )[0]!;
+  }
+
+  it('круг меньше тач-таргета, зона касания добрана до 44 точек', () => {
+    const tree = render(
+      <IconButton
+        icon="close"
+        accent="rose"
+        accessibilityLabel="Открепить файл скан.pdf"
+        testID="detach"
+      />,
+    );
+
+    expect(buttonOf(tree).props.hitSlop).toBe(FILLED_HIT_SLOP);
+    expect(FILLED_ICON_BUTTON_SIZE + FILLED_HIT_SLOP * 2).toBe(
+      MIN_TOUCH_TARGET,
+    );
+  });
+
+  it('без заливки зона касания и так 44 точки — hitSlop не нужен', () => {
+    const tree = render(
+      <IconButton
+        icon="close"
+        color="danger"
+        accessibilityLabel="Открепить файл скан.pdf"
+        testID="detach"
+      />,
+    );
+
+    expect(buttonOf(tree).props.hitSlop).toBeUndefined();
+  });
+});
+
+describe('GradientSpinner', () => {
+  it('для скринридера — индикатор выполнения с подписью', () => {
+    const tree = render(
+      <GradientSpinner accessibilityLabel="Загрузка заявок" testID="spinner" />,
+    );
+
+    const spinner = tree.root.findAll(
+      node => node.props.testID === 'spinner' && node.props.accessibilityRole,
+    )[0]!;
+    expect(spinner.props.accessibilityRole).toBe('progressbar');
+    expect(spinner.props.accessibilityLabel).toBe('Загрузка заявок');
+  });
+
+  it('дуга рисуется градиентом из темы', () => {
+    const tree = render(<GradientSpinner accessibilityLabel="Загрузка" />);
+
+    const arcs = tree.root.findAll(
+      node =>
+        typeof node.props.stroke === 'string' &&
+        node.props.stroke.startsWith('url(#spinner-'),
+    );
+    expect(arcs.length).toBeGreaterThan(0);
+  });
+});
+
+describe('TextField отключённое', () => {
+  it('подсказка — отдельным цветом палитры, без склейки строк', () => {
+    const tree = render(
+      <TextField
+        label="Номер"
+        accessibilityLabel="Номер"
+        testID="passport"
+        placeholder="Номер паспорта"
+        editable={false}
+      />,
+    );
+
+    const colors = [
+      lightColors.placeholderDisabled,
+      darkColors.placeholderDisabled,
+    ];
+    expect(colors).toContain(
+      resolvedProp(tree, 'passport', 'placeholderTextColor'),
+    );
   });
 });

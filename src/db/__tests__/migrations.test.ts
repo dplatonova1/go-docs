@@ -128,6 +128,13 @@ describe('MIGRATIONS', () => {
     expect(sql).toContain('ALTER TABLE documents ADD COLUMN thumbnail BLOB');
   });
 
+  it('миграция 5 снимает миниатюру: в базе только метаданные', () => {
+    const fifth = MIGRATIONS.find(item => item.version === 5);
+    const sql = (fifth?.statements ?? []).join(' ');
+
+    expect(sql).toContain('ALTER TABLE documents DROP COLUMN thumbnail');
+  });
+
   it('внешние ключи покрыты индексами', () => {
     // Без индекса по дочерней колонке каскадное удаление превращается в
     // полный перебор таблицы на каждую удаляемую родительскую строку.

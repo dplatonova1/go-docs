@@ -12,6 +12,7 @@
 
 import React from 'react';
 
+import { GradientRing } from '../../../components/GradientRing';
 import { StorageError, StorageErrorCode } from '../../../storage/errors';
 import { getLocale, setLocale } from '../../../i18n';
 import {
@@ -179,5 +180,16 @@ describe('тема', () => {
     await flush();
 
     expect(exists(tree, TEST_IDS.themeSaveError)).toBe(true);
+  });
+});
+
+describe('рамка выбранного варианта', () => {
+  it('градиентная рамка — только у выбранного языка', async () => {
+    setLocale('ru');
+    const tree = await render(<SettingsScreen />);
+    await flush();
+
+    expect(findByTestId(tree, RU).findAllByType(GradientRing)).toHaveLength(1);
+    expect(findByTestId(tree, EN).findAllByType(GradientRing)).toHaveLength(0);
   });
 });

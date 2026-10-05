@@ -6,6 +6,8 @@
  * запроса tsc бы не помешал.
  */
 
+import type { QualityFlag } from '../package/types';
+
 export type ApplicationId = string & { readonly __brand: 'ApplicationId' };
 export type ChecklistItemId = string & { readonly __brand: 'ChecklistItemId' };
 export type DocumentId = string & { readonly __brand: 'DocumentId' };
@@ -102,6 +104,11 @@ export type AttachedDocument = {
   readonly sizeBytes: number | null;
   /** Относительный путь зашифрованного файла — нужен для превью. */
   readonly filePath: string;
+  /**
+   * Пометка детектора качества при прикреплении (`documents.quality_flag`)
+   * или `null` — замечаний нет, не снимок или ещё не проверялся.
+   */
+  readonly qualityFlag: QualityFlag | null;
 };
 
 export type ChecklistItem = {
@@ -193,11 +200,8 @@ export type NewDocumentAttachment = {
   readonly sizeBytes: number;
   /** SHA-256 незашифрованного содержимого — ключ дедупликации. */
   readonly contentHash: string;
-  /**
-   * JPEG-миниатюра для плитки превью или `null` — PDF или сбой разбора
-   * (`features/library/thumbnail.ts`).
-   */
-  readonly thumbnail: Uint8Array | null;
+  /** Пометка детектора качества, посчитанная при прикреплении. */
+  readonly qualityFlag: QualityFlag | null;
 };
 
 /**
@@ -262,6 +266,11 @@ export type LibraryDocument = {
   readonly createdAt: string;
   /** Относительный путь зашифрованного файла — нужен для превью. */
   readonly filePath: string;
+  /**
+   * Пометка детектора качества при прикреплении (`documents.quality_flag`)
+   * или `null` — замечаний нет, не снимок или ещё не проверялся.
+   */
+  readonly qualityFlag: QualityFlag | null;
   /**
    * Документ уже прикреплён к пункту, для которого открыт выбор.
    * Всегда `false`, когда библиотека открыта на просмотр.

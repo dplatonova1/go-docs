@@ -4,6 +4,7 @@ export type IconName =
   | 'back'
   | 'chevronRight'
   | 'close'
+  | 'document'
   | 'home'
   | 'library'
   | 'settings';

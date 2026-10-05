@@ -19,7 +19,7 @@ import { useTranslation } from '../../../i18n';
 import { formatAddedDate } from '../formatAddedDate';
 import { DocumentPreviewTile } from '../DocumentPreviewTile';
 import { TEST_ID_PREFIX } from './constants';
-import { Actions, Info, Meta, Name, actionStyle } from './styles';
+import { Actions, Info, Meta, Name, QualityNote, actionStyle } from './styles';
 import type { DocumentRowProps } from './types';
 
 export const DocumentRow = memo(function DocumentRowImpl({
@@ -110,6 +110,11 @@ export const DocumentRow = memo(function DocumentRowImpl({
           {name}
         </Name>
         <Meta testID={`${testID}-added`}>{t.documentRow.added(added)}</Meta>
+        {document.qualityFlag === null ? null : (
+          <QualityNote testID={`${testID}-quality`}>
+            {t.documentQuality[document.qualityFlag]}
+          </QualityNote>
+        )}
       </Info>
     </Card>
   );

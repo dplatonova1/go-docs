@@ -123,6 +123,7 @@ describe('прикрепление файла', () => {
             mime_type: 'application/pdf',
             size_bytes: 2048,
             file_path: 'documents/doc-1',
+            quality_flag: null,
           },
         ]
       : [];
@@ -141,6 +142,7 @@ describe('прикрепление файла', () => {
         mimeType: 'application/pdf',
         sizeBytes: 2048,
         filePath: 'documents/doc-1',
+        qualityFlag: null,
       },
     });
     expect(log).toEqual([

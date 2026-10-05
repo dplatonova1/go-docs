@@ -201,11 +201,9 @@ export const en: Messages = {
     announceDeleted: 'File deleted from the library',
   },
 
-  documentPreview: {
-    none: 'No preview',
-    loading: 'Preview…',
-    failed: 'File unavailable',
-    noFile: 'No file',
+  documentQuality: {
+    blurry: 'The photo may be blurry',
+    dark: 'The photo may be too dark',
   },
 
   documentRow: {

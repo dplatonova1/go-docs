@@ -23,15 +23,17 @@ import { Card } from '../../../components/Card';
 import { IconButton } from '../../../components/IconButton';
 import { useTranslation } from '../../../i18n';
 import { DocumentPreviewTile } from '../../library/DocumentPreviewTile';
-import { isPreviewable } from '../../library/useDocumentPreview';
+import { canHaveThumbnail } from '../../library/thumbnail';
 import { isAttached, type AttachedDocument } from '../model';
 import { TEST_ID_PREFIX } from './constants';
 import {
   ErrorText,
+  FileInfo,
   FileName,
   FileRow,
   Label,
   NoticeText,
+  QualityNote,
   StatusBadge,
   StatusText,
 } from './styles';
@@ -55,7 +57,9 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
   const testID = `${TEST_ID_PREFIX}-${index}`;
   const attached = isAttached(item);
   const previewDocument =
-    item.documents.find(isPreviewable) ?? item.documents[0] ?? null;
+    item.documents.find(document => canHaveThumbnail(document.mimeType)) ??
+    item.documents[0] ??
+    null;
   const statusText = attached
     ? t.checklistItem.statusAttached
     : t.checklistItem.statusNotAttached;
@@ -140,15 +144,22 @@ export const ChecklistItemRow = memo(function ChecklistItemRowImpl({
 
         return (
           <FileRow key={document.id}>
-            <FileName
-              accessibilityLabel={t.checklistItem.fileA11y(name)}
-              testID={`${testID}-file-${documentIndex}`}
-              // Середина, а не конец: расширение в конце имени важнее.
-              numberOfLines={1}
-              ellipsizeMode="middle"
-            >
-              {name}
-            </FileName>
+            <FileInfo>
+              <FileName
+                accessibilityLabel={t.checklistItem.fileA11y(name)}
+                testID={`${testID}-file-${documentIndex}`}
+                // Середина, а не конец: расширение в конце имени важнее.
+                numberOfLines={1}
+                ellipsizeMode="middle"
+              >
+                {name}
+              </FileName>
+              {document.qualityFlag === null ? null : (
+                <QualityNote testID={`${testID}-file-${documentIndex}-quality`}>
+                  {t.documentQuality[document.qualityFlag]}
+                </QualityNote>
+              )}
+            </FileInfo>
 
             {/* Иконка в стилистике кнопок удаления: круг с заливкой
                 `rose` (решено 2026-10-02). */}

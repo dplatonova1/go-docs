@@ -17,6 +17,8 @@
 
 import type { ViewStyle } from 'react-native';
 
+import { rim } from './helpers';
+
 /** Опорная точка градиента рамки: доля ширины поля и цвет. */
 export type GradientStop = {
   readonly offset: number;
@@ -31,18 +33,6 @@ export type FieldStyle = {
   /** Градиент рамки в фокусе, слева направо. */
   readonly focusBorder: readonly GradientStop[];
 };
-
-/** Кант в 1 точку внутренней тенью — как у кнопок и карточек. */
-function rim(color: string) {
-  return {
-    inset: true,
-    offsetX: 0,
-    offsetY: 0,
-    blurRadius: 0,
-    spreadDistance: 1,
-    color,
-  };
-}
 
 // Тёмная: на референсе тело поля сверху #1C264A, снизу #162043 —
 // светлее и синее фона; верхний кант #2C395B.
@@ -85,9 +75,11 @@ export const DARK_FIELD: FieldStyle = {
 
 // Светлая: тело сверху почти белое (#F1F5FE), книзу сливается с фоном,
 // кант белый, под полем тень на 6–8 уровней темнее фона.
+// Темнее прежнего белого блика (2026-10-05): поле сливалось с карточкой
+// и фоном. Лёгкий голубовато-серый тон вместо белого.
 const LIGHT_SHEEN =
-  'linear-gradient(180deg, rgba(255, 255, 255, 0.4) 0%, ' +
-  'rgba(255, 255, 255, 0) 85%)';
+  'linear-gradient(180deg, rgba(120, 135, 190, 0.05) 0%, ' +
+  'rgba(120, 135, 190, 0.1) 100%)';
 
 const LIGHT_DROP = {
   offsetX: 0,
@@ -103,8 +95,8 @@ export const LIGHT_FIELD: FieldStyle = {
   },
   focused: {
     backgroundImage:
-      'linear-gradient(180deg, rgba(255, 255, 255, 0.6) 0%, ' +
-      'rgba(255, 255, 255, 0.25) 100%)',
+      'linear-gradient(180deg, rgba(255, 255, 255, 0.3) 0%, ' +
+      'rgba(255, 255, 255, 0.1) 100%)',
     boxShadow: [
       LIGHT_DROP,
       {

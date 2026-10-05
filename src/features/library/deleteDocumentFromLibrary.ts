@@ -21,6 +21,7 @@
 import { deleteFile, toRelativePath } from '../../storage/fs';
 import type { DocumentId } from '../checklist/model';
 import { deleteDocument } from '../checklist/repository';
+import { deleteThumbnail } from './thumbnailStore';
 
 export async function deleteDocumentFromLibrary(
   documentId: DocumentId,
@@ -38,4 +39,8 @@ export async function deleteDocumentFromLibrary(
     // Записи в БД уже нет, и сказать пользователю «не удалось» было бы
     // неправдой: для него документ удалён и больше не показывается.
   }
+
+  // Миниатюра — тоже файл (`thumbnails/<id>`), в базе о ней ничего нет.
+  // Не бросает: её отсутствие не ошибка.
+  await deleteThumbnail(documentId);
 }

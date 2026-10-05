@@ -319,6 +319,7 @@ describe('listChecklistItems', () => {
           mime_type: 'application/pdf',
           size_bytes: 2048,
           file_path: 'documents/d1',
+          quality_flag: null,
         },
         {
           checklist_item_id: 'i1',
@@ -327,6 +328,7 @@ describe('listChecklistItems', () => {
           mime_type: 'application/pdf',
           size_bytes: 2048,
           file_path: 'documents/d2',
+          quality_flag: null,
         },
       ],
     );
@@ -344,6 +346,7 @@ describe('listChecklistItems', () => {
             mimeType: 'application/pdf',
             sizeBytes: 2048,
             filePath: 'documents/d1',
+            qualityFlag: null,
           },
           {
             id: 'd2',
@@ -351,6 +354,7 @@ describe('listChecklistItems', () => {
             mimeType: 'application/pdf',
             sizeBytes: 2048,
             filePath: 'documents/d2',
+            qualityFlag: null,
           },
         ],
       },
@@ -402,7 +406,7 @@ describe('attachDocumentToItem', () => {
     mimeType: 'application/pdf',
     sizeBytes: 2048,
     contentHash: 'a'.repeat(64),
-    thumbnail: new Uint8Array([0xff, 0xd8]),
+    qualityFlag: null,
   };
 
   /**
@@ -422,6 +426,7 @@ describe('attachDocumentToItem', () => {
             mime_type: 'application/pdf',
             size_bytes: 2048,
             file_path: 'documents/doc-1',
+            quality_flag: null,
           }
         : options.storedRow;
 
@@ -455,6 +460,7 @@ describe('attachDocumentToItem', () => {
         mimeType: 'application/pdf',
         sizeBytes: 2048,
         filePath: 'documents/doc-1',
+        qualityFlag: null,
       },
     });
 
@@ -474,7 +480,7 @@ describe('attachDocumentToItem', () => {
       'application/pdf',
       2048,
       'a'.repeat(64),
-      new Uint8Array([0xff, 0xd8]),
+      null,
       expect.any(String),
       expect.any(String),
     ]);
@@ -494,6 +500,7 @@ describe('attachDocumentToItem', () => {
         mime_type: 'application/pdf',
         size_bytes: 2048,
         file_path: 'documents/doc-0',
+        quality_flag: null,
       },
     });
 
@@ -505,6 +512,7 @@ describe('attachDocumentToItem', () => {
         mimeType: 'application/pdf',
         sizeBytes: 2048,
         filePath: 'documents/doc-0',
+        qualityFlag: null,
       },
     });
 
@@ -526,6 +534,7 @@ describe('attachDocumentToItem', () => {
         mimeType: 'application/pdf',
         sizeBytes: 2048,
         filePath: 'documents/doc-1',
+        qualityFlag: null,
       },
     });
 

@@ -40,6 +40,7 @@ const DOCUMENT_ROW = {
   mime_type: 'application/pdf',
   size_bytes: 2048,
   file_path: 'documents/doc-1',
+  quality_flag: null,
   created_at: '2026-03-12T10:00:00.000Z',
 };
 
@@ -88,6 +89,7 @@ describe('listLibraryDocuments', () => {
         sizeBytes: 2048,
         createdAt: '2026-03-12T10:00:00.000Z',
         filePath: 'documents/doc-1',
+        qualityFlag: null,
         isAttachedToItem: false,
       },
     ]);

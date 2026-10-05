@@ -1,7 +1,7 @@
 import type { ViewStyle } from 'react-native';
 import styled, { css, toStyleSheet } from 'styled-components/native';
 
-import { CARD_LIST_GAP, RADII } from '../../../theme/metrics';
+import { RADII } from '../../../theme/metrics';
 import { FONTS, textSize } from '../../../theme/typography';
 import { OPTION_MIN_HEIGHT } from './constants';
 import type { OptionStyleProps } from './types';
@@ -22,13 +22,9 @@ export const Hint = styled.Text`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
-/**
- * Языки списком в столбик: их немного, и каждый читается целиком.
- * Промежуток — как между карточками: тень строки уходит за её край, и
- * при 8 точках доходила до соседней.
- */
+/** Языки списком в столбик: их немного, и каждый читается целиком. */
 export const OptionList = styled.View`
-  gap: ${CARD_LIST_GAP}px;
+  gap: 8px;
   margin-top: 4px;
 `;
 
@@ -52,15 +48,6 @@ export const Option = styled.Pressable`
   border-radius: ${RADII.field}px;
   background-color: ${({ theme }) => theme.colors.surface};
 `;
-
-/**
- * Выбранная строка — поверх соседних. Строки рисуются по порядку, и тень
- * следующей (она уходит вверх за край) ложилась на нижнюю кромку
- * градиентной рамки выбранной и срезала её наполовину.
- */
-export const selectedOptionStyle: ViewStyle = toStyleSheet(css`
-  z-index: 1;
-`);
 
 /** См. `components/Button/styles.ts`: Pressable отдаёт нажатие колбэком. */
 export const pressedStyle: ViewStyle = toStyleSheet(css`

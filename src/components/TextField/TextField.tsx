@@ -20,7 +20,7 @@ import { useTheme } from 'styled-components/native';
 import { RADII } from '../../theme/metrics';
 import { GradientRing } from '../GradientRing';
 
-import { DISABLED_PLACEHOLDER_ALPHA, ERROR_TEST_ID_SUFFIX } from './constants';
+import { ERROR_TEST_ID_SUFFIX } from './constants';
 import {
   Container,
   ErrorText,
@@ -84,7 +84,7 @@ export function TextField({
           // До `rest`, чтобы экран мог задать свой цвет плейсхолдера.
           placeholderTextColor={
             isDisabled
-              ? `${theme.colors.textSecondary}${DISABLED_PLACEHOLDER_ALPHA}`
+              ? theme.colors.placeholderDisabled
               : theme.colors.textSecondary
           }
           onFocus={handleFocus}

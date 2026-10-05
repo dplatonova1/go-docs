@@ -159,6 +159,20 @@ export const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE documents ADD COLUMN thumbnail BLOB`,
     ],
   },
+
+  {
+    version: 5,
+    name: 'drop_document_thumbnail',
+    statements: [
+      // Миниатюра ушла из базы в зашифрованный файл `thumbnails/<id>`
+      // (решено 2026-10-05): в базе — только метаданные (`src/db/README.md`).
+      // Миграция 4 уже применена на устройствах, поэтому колонка снимается
+      // новой миграцией, а не правкой старой. Миниатюры, успевшие лечь в
+      // колонку, пропадают вместе с ней — их сделает заново первый показ.
+      // DROP COLUMN — с SQLite 3.35; в op-sqlite SQLCipher на 3.51.
+      `ALTER TABLE documents DROP COLUMN thumbnail`,
+    ],
+  },
 ];
 
 /**

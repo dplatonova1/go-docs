@@ -21,6 +21,3 @@ export const INPUT_VERTICAL_PADDING = 28;
  * (`RADII.field`). Больше `MIN_TOUCH_TARGET`.
  */
 export const FIELD_MIN_HEIGHT = 52;
-
-/** Прозрачность плейсхолдера отключённого поля — тусклее обычного. */
-export const DISABLED_PLACEHOLDER_ALPHA = '99';

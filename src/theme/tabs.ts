@@ -9,12 +9,14 @@
  * - Неактивная: иконка в едва заметном круге, иконка и подпись
  *   приглушённые синевато-серые.
  *
- * Контраст белого на активной пилюле — 1.8–3.7:1, приглушённого цвета в
- * светлой теме — около 4:1, ниже порога `colors.ts`. Принято вместе с
- * остальными градиентами до общего разбора контраста.
+ * Контраст (2026-10-05): белый на активной пилюле и приглушённый цвет
+ * неактивных — не ниже 4.5:1 (WCAG AA); порог `colors.ts` (7:1) для
+ * градиентов не достигается без потери цвета.
  */
 
-import type { BoxShadowValue, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
+
+import { rim } from './helpers';
 
 export type TabsStyle = {
   /** Заливка активной вкладки: градиент, кант, свечение. */
@@ -27,25 +29,29 @@ export type TabsStyle = {
   readonly inactiveForeground: string;
 };
 
-/** Кант в 1 точку внутренней тенью — как у кнопок. */
-const RIM: BoxShadowValue = {
-  inset: true,
-  offsetX: 0,
-  offsetY: 0,
-  blurRadius: 0,
-  spreadDistance: 1,
-  color: 'rgba(255, 255, 255, 0.25)',
-};
-
 /**
  * Градиенты активной вкладки. Их же берёт голубая кнопка `sky`
  * (`accent.ts`, решено 2026-10-02): главное действие экрана и активная
- * вкладка — один цвет.
+ * вкладка — один цвет, в каждой теме свой.
  */
+// Тёмная затемнена 2026-10-05, чтобы белый держал 4.5:1 (WCAG AA) по
+// всей длине: прежде #72BCFF → #6A90FC → #AA5EFC давал 1.8–3.7:1.
 export const DARK_TAB_GRADIENT =
-  'linear-gradient(120deg, #72BCFF 0%, #6A90FC 45%, #AA5EFC 100%)';
+  'linear-gradient(120deg, #0075E0 0%, #386BFB 45%, #9B42FB 100%)';
+// Светлая — пастельный голубой с тёмной надписью (решено 2026-10-05):
+// тёмный градиент с белой надписью на светлом экране был тяжёлым.
 export const LIGHT_TAB_GRADIENT =
   'linear-gradient(120deg, #93C8FC 0%, #7EA8FC 45%, #B773FE 100%)';
+
+/**
+ * Надпись на светлой пастели — белая (решено 2026-10-05, после пробы
+ * тёмно-синей #20295B): 1.8–3:1, ниже 4.5:1, принято осознанно —
+ * исключение в `accent.test.ts`. Рамка — тёмно-синяя с плотностью 18%
+ * (сначала 28%, как у «Прикреплено», — вышло резковато). Их же берёт голубая
+ * кнопка `sky`.
+ */
+export const LIGHT_TAB_FOREGROUND = '#FFFFFF';
+export const LIGHT_TAB_BORDER = 'rgba(32, 41, 91, 0.18)';
 
 /** Свечение под активной вкладкой и под кнопкой `sky`. */
 export const DARK_TAB_GLOW = 'rgba(110, 120, 250, 0.45)';
@@ -55,7 +61,7 @@ export const DARK_TABS: TabsStyle = {
   activeFill: {
     backgroundImage: DARK_TAB_GRADIENT,
     boxShadow: [
-      RIM,
+      rim('rgba(255, 255, 255, 0.25)'),
       {
         offsetX: 0,
         offsetY: 6,
@@ -74,7 +80,7 @@ export const LIGHT_TABS: TabsStyle = {
   activeFill: {
     backgroundImage: LIGHT_TAB_GRADIENT,
     boxShadow: [
-      RIM,
+      rim(LIGHT_TAB_BORDER),
       {
         offsetX: 0,
         offsetY: 6,
@@ -84,7 +90,9 @@ export const LIGHT_TABS: TabsStyle = {
       },
     ],
   },
-  activeForeground: '#FFFFFF',
+  activeForeground: LIGHT_TAB_FOREGROUND,
   inactiveBubble: 'rgba(120, 140, 190, 0.1)',
-  inactiveForeground: '#6F7689',
+  // Затемнялся вслед за панелью: #6F7689 → #666C7E (2026-10-05) →
+  // #646A7B (фон #CBD3E5, 2026-10-06), не ниже 4.5:1.
+  inactiveForeground: '#646A7B',
 };

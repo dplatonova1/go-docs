@@ -38,11 +38,15 @@ beforeEach(() => {
   });
 });
 
-it('сначала транзакция в БД, потом файл', async () => {
+it('сначала транзакция в БД, потом файл и его миниатюра', async () => {
   await deleteDocumentFromLibrary(DOCUMENT_ID);
 
   expect(repository.deleteDocument).toHaveBeenCalledWith(DOCUMENT_ID);
-  expect(log).toEqual(['db', 'delete documents/doc-1']);
+  expect(log).toEqual([
+    'db',
+    'delete documents/doc-1',
+    'delete thumbnails/doc-1',
+  ]);
 });
 
 it('записи уже не было — файл не трогаем', async () => {

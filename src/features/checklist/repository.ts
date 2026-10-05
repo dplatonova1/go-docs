@@ -49,6 +49,7 @@
  */
 
 import { getDb, withTransaction } from '../../db/client';
+import type { QualityFlag } from '../package/types';
 import { newId } from '../../db/ids';
 import { StorageError, StorageErrorCode } from '../../storage/errors';
 import {
@@ -107,7 +108,7 @@ const SELECT_CHECKLIST_ITEMS =
 
 const SELECT_ATTACHED_DOCUMENTS =
   'SELECT cid.checklist_item_id, d.id, d.original_filename, ' +
-  'd.mime_type, d.size_bytes, d.file_path ' +
+  'd.mime_type, d.size_bytes, d.file_path, d.quality_flag ' +
   'FROM checklist_items ci ' +
   'JOIN checklist_item_documents cid ON cid.checklist_item_id = ci.id ' +
   'JOIN documents d ON d.id = cid.document_id ' +
@@ -121,12 +122,12 @@ const SELECT_ATTACHED_DOCUMENTS =
  */
 const INSERT_DOCUMENT =
   'INSERT OR IGNORE INTO documents ' +
-  '(id, original_filename, file_path, mime_type, size_bytes, content_hash, thumbnail, created_at, updated_at) ' +
+  '(id, original_filename, file_path, mime_type, size_bytes, content_hash, quality_flag, created_at, updated_at) ' +
   'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)';
 
 /** Поиск уже загруженного файла по отпечатку содержимого. */
 const SELECT_DOCUMENT_BY_CONTENT_HASH =
-  'SELECT id, original_filename, mime_type, size_bytes, file_path ' +
+  'SELECT id, original_filename, mime_type, size_bytes, file_path, quality_flag ' +
   'FROM documents WHERE content_hash = ?';
 
 const INSERT_CHECKLIST_ITEM_DOCUMENT =
@@ -181,7 +182,7 @@ const SELECT_PACKAGE_ENTRIES =
 // Библиотека документов. Сортировка — новые сверху: последнее, что
 // загрузили, почти всегда и нужно.
 const SELECT_LIBRARY_DOCUMENTS =
-  'SELECT id, original_filename, mime_type, size_bytes, file_path, created_at ' +
+  'SELECT id, original_filename, mime_type, size_bytes, file_path, quality_flag, created_at ' +
   'FROM documents ORDER BY created_at DESC, id DESC';
 
 const SELECT_DOCUMENT_IDS_OF_ITEM =
@@ -205,15 +206,13 @@ const SELECT_DOCUMENT_USAGE =
 const SELECT_ITEM_IDS_OF_DOCUMENT =
   'SELECT checklist_item_id FROM checklist_item_documents WHERE document_id = ?';
 
-const SELECT_DOCUMENT_THUMBNAIL =
-  'SELECT thumbnail FROM documents WHERE id = ?';
-
 /**
- * Только если миниатюры ещё нет: две строки, одновременно делающие
- * миниатюру одному документу, не перезапишут друг друга.
+ * Пометка детектора для документа, прикреплённого до детектора при
+ * прикреплении: её считает первый показ (`useDocumentPreview`). Только
+ * если пометки ещё нет — ставит, но не снимает.
  */
-const UPDATE_DOCUMENT_THUMBNAIL =
-  'UPDATE documents SET thumbnail = ? WHERE id = ? AND thumbnail IS NULL';
+const UPDATE_DOCUMENT_QUALITY =
+  'UPDATE documents SET quality_flag = ? WHERE id = ? AND quality_flag IS NULL';
 
 const SELECT_DOCUMENT_FILE_PATH =
   'SELECT file_path FROM documents WHERE id = ?';
@@ -303,6 +302,15 @@ function readSize(row: Row): number | null {
  * Прикреплённый документ из строки `documents`. Тип, размер и путь —
  * для превью в пункте чек-листа (`useDocumentPreview`).
  */
+/** `documents.quality_flag`: `blurry`, `dark` или `null`. */
+function readQuality(row: Row): QualityFlag | null {
+  const value = readNullableText(row, 'documents', 'quality_flag');
+  if (value === null || value === 'blurry' || value === 'dark') {
+    return value;
+  }
+  throw malformedRow('documents', 'quality_flag');
+}
+
 function toAttachedDocument(row: Row): AttachedDocument {
   return {
     id: readText(row, 'documents', 'id') as DocumentId,
@@ -310,6 +318,7 @@ function toAttachedDocument(row: Row): AttachedDocument {
     mimeType: readNullableText(row, 'documents', 'mime_type'),
     sizeBytes: readSize(row),
     filePath: readText(row, 'documents', 'file_path'),
+    qualityFlag: readQuality(row),
   };
 }
 
@@ -318,19 +327,15 @@ function toLibraryDocument(
   attachedIds: ReadonlySet<string>,
 ): LibraryDocument {
   const id = readText(row, 'documents', 'id');
-  const size = row.size_bytes;
-
-  if (size !== null && (typeof size !== 'number' || !Number.isInteger(size))) {
-    throw malformedRow('documents', 'size_bytes');
-  }
 
   return {
     id: id as DocumentId,
     name: readNullableText(row, 'documents', 'original_filename'),
     mimeType: readNullableText(row, 'documents', 'mime_type'),
-    sizeBytes: size,
+    sizeBytes: readSize(row),
     createdAt: readText(row, 'documents', 'created_at'),
     filePath: readText(row, 'documents', 'file_path'),
+    qualityFlag: readQuality(row),
     isAttachedToItem: attachedIds.has(id),
   };
 }
@@ -556,7 +561,7 @@ export function attachDocumentToItem(
         input.mimeType,
         input.sizeBytes,
         input.contentHash,
-        input.thumbnail,
+        input.qualityFlag,
         now,
         now,
       ]);
@@ -620,45 +625,17 @@ export function attachDocumentToItem(
  * при сбросе заявки — см. «Отложенные обязательства» в CLAUDE.md.
  */
 /**
- * Миниатюра документа (`documents.thumbnail`, миграция 4) или `null`,
- * если её нет: PDF, сбой разбора, запись старше миграции. Документ мог
- * быть удалён — тогда тоже `null`.
- *
- * BLOB op-sqlite отдаёт как `ArrayBuffer`, `node:sqlite` в тестах — как
- * `Uint8Array`; читаются оба.
+ * Ставит пометку детектора документу, у которого её нет (прикреплён до
+ * детектора). Пустую пометку не пишет: «замечаний нет» и «не проверялся»
+ * в колонке выглядят одинаково.
  */
-export function getDocumentThumbnail(
+export function saveDocumentQuality(
   documentId: DocumentId,
-): Promise<Uint8Array | null> {
-  return guarded('Не удалось прочитать миниатюру', async () => {
-    const db = await getDb();
-    const result = await db.execute(SELECT_DOCUMENT_THUMBNAIL, [documentId]);
-    const value = result.rows[0]?.thumbnail;
-
-    if (value === undefined || value === null) {
-      return null;
-    }
-    if (value instanceof ArrayBuffer) {
-      return new Uint8Array(value);
-    }
-    if (ArrayBuffer.isView(value)) {
-      return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    }
-    throw malformedRow('documents', 'thumbnail');
-  });
-}
-
-/**
- * Записывает миниатюру, сделанную при первом показе документа, у
- * которого её не было (записи старше миграции 4).
- */
-export function saveDocumentThumbnail(
-  documentId: DocumentId,
-  thumbnail: Uint8Array,
+  quality: QualityFlag,
 ): Promise<void> {
-  return guarded('Не удалось сохранить миниатюру', async () => {
+  return guarded('Не удалось сохранить пометку о качестве', async () => {
     const db = await getDb();
-    await db.execute(UPDATE_DOCUMENT_THUMBNAIL, [thumbnail, documentId]);
+    await db.execute(UPDATE_DOCUMENT_QUALITY, [quality, documentId]);
   });
 }
 
@@ -721,19 +698,11 @@ export function listPackageEntries(
         continue;
       }
 
-      const size = row.size_bytes;
-      if (
-        size !== null &&
-        (typeof size !== 'number' || !Number.isInteger(size))
-      ) {
-        throw malformedRow('documents', 'size_bytes');
-      }
-
       documents.push({
         id: readText(row, 'documents', 'document_id') as DocumentId,
         name: readNullableText(row, 'documents', 'original_filename'),
         mimeType: readNullableText(row, 'documents', 'mime_type'),
-        sizeBytes: size,
+        sizeBytes: readSize(row),
         filePath: readText(row, 'documents', 'file_path'),
       });
     }

@@ -22,7 +22,7 @@ export const StatusBadge = styled.View<StatusStyleProps>`
   border-radius: ${RADII.pill}px;
   border-width: 1px;
   border-color: ${({ theme, $attached }) =>
-    $attached ? theme.colors.attachedBorder : theme.colors.border};
+    $attached ? theme.colors.attachedBorder : theme.colors.notAttachedBorder};
   background-color: ${({ theme, $attached }) =>
     $attached ? theme.colors.attachedSurface : theme.colors.surface};
 `;
@@ -35,20 +35,40 @@ export const StatusText = styled.Text<StatusStyleProps>`
 `;
 
 /**
- * Имя файла и кнопка удаления в одну строку. При крупном системном шрифте
- * кнопка переносится под имя, а не сжимает его до многоточия.
+ * Имя файла и кнопка открепления в одну строку, по центру по вертикали.
+ * Имя сжимается многоточием, кнопка-иконка всегда справа.
  */
-/** Имя файла сжимается многоточием, кнопка-иконка всегда справа. */
 export const FileRow = styled.View`
   flex-direction: row;
   align-items: center;
   gap: 8px;
 `;
 
-export const FileName = styled.Text`
+/** Имя файла и, если есть, пометка о качестве под ним. */
+export const FileInfo = styled.View`
   flex-grow: 1;
   flex-shrink: 1;
   flex-basis: auto;
+  justify-content: center;
+  gap: 2px;
+`;
+
+/**
+ * Пометка детектора качества. Цвет `danger` заметнее, но не единственный
+ * признак — смысл несёт текст.
+ */
+export const QualityNote = styled.Text`
+  ${textSize(13)}
+  font-family: ${FONTS.regular};
+  color: ${({ theme }) => theme.colors.danger};
+`;
+
+/**
+ * Без `flex-grow`: в столбике `FileInfo` он растягивал текст по
+ * вертикали, и имя прижималось к верху строки (2026-10-06). Ширину
+ * задаёт `FileInfo`.
+ */
+export const FileName = styled.Text`
   ${textSize(14)}
   font-family: ${FONTS.regular};
   color: ${({ theme }) => theme.colors.text};

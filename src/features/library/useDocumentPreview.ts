@@ -2,16 +2,16 @@
  * Превью документа для плитки карточки — по миниатюре
  * ([`thumbnail.ts`](./thumbnail.ts)), а не по исходному файлу.
  *
- * Миниатюра делается один раз при прикреплении и хранится в строке
- * `documents` (миграция 4). Показ превью — это чтение нескольких
- * килобайт из базы, без расшифровки файла: так снято ограничение
+ * Миниатюра делается один раз при прикреплении и хранится зашифрованным
+ * файлом `thumbnails/<id документа>`. Показ превью — это расшифровка
+ * нескольких килобайт, а не исходного файла: так снято ограничение
  * «только JPEG/PNG до 2 МБ, расшифровка целиком при каждом показе»
  * ([ADR-0017](../../../docs/adr/0017-document-library-screen.md),
  * «Обновление»).
  *
- * У записей, созданных до миграции 4, миниатюры нет. Для них она
+ * У документов, прикреплённых до миниатюр, её нет. Для них она
  * делается при первом показе — один раз расшифровывается исходный файл
- * — и сразу сохраняется, так что дальше и они читаются из базы. Если
+ * — и сразу сохраняется, так что дальше и они читаются с миниатюры. Если
  * файл сейчас на экране в нескольких местах, работа не повторяется:
  * идущие запросы общие (`inFlight`).
  *
@@ -31,15 +31,13 @@ import {
   type DocumentId,
   type LibraryDocument,
 } from '../checklist/model';
-import {
-  getDocumentThumbnail,
-  saveDocumentThumbnail,
-} from '../checklist/repository';
+import { saveDocumentQuality } from '../checklist/repository';
 import {
   THUMBNAIL_MIME_TYPE,
+  analyzeImage,
   canHaveThumbnail,
-  makeThumbnail,
 } from './thumbnail';
+import { readThumbnail, saveThumbnail } from './thumbnailStore';
 
 export type PreviewState =
   | { readonly status: 'none' }
@@ -69,17 +67,17 @@ export function isPreviewable(document: PreviewSource): boolean {
 const inFlight = new Map<DocumentId, Promise<Uint8Array | null>>();
 
 /**
- * Миниатюра из базы, а если её нет — сделанная из исходного файла и
+ * Миниатюра с диска, а если её нет — сделанная из исходного файла и
  * сохранённая.
  *
  * @returns байты миниатюры или `null`, если её не сделать (размер
  *   неизвестен или больше предела прикрепления, картинка не разбирается).
- * @throws ошибки чтения базы и файла — плитка покажет «Файл недоступен».
+ * @throws ошибки чтения и расшифровки — плитка покажет заглушку.
  */
 async function loadThumbnail(
   document: PreviewSource,
 ): Promise<Uint8Array | null> {
-  const stored = await getDocumentThumbnail(document.id);
+  const stored = await readThumbnail(document.id);
   if (stored !== null) {
     return stored;
   }
@@ -94,11 +92,17 @@ async function loadThumbnail(
   }
 
   const bytes = await readFile(toRelativePath(document.filePath));
-  const thumbnail = await makeThumbnail(bytes, document.mimeType);
+  const { thumbnail, quality } = await analyzeImage(bytes, document.mimeType);
 
   if (thumbnail !== null) {
     // Не сохранилась — не беда: покажем сейчас, сделаем в следующий раз.
-    await saveDocumentThumbnail(document.id, thumbnail).catch(() => undefined);
+    await saveThumbnail(document.id, thumbnail);
+  }
+  // Документ прикреплён до детектора: раз файл всё равно расшифрован,
+  // ставим и пометку о качестве. Увидят её при следующем открытии
+  // экрана — строка уже на экране со старыми данными.
+  if (quality !== null) {
+    await saveDocumentQuality(document.id, quality).catch(() => undefined);
   }
   return thumbnail;
 }
@@ -116,16 +120,26 @@ function sharedLoad(document: PreviewSource): Promise<Uint8Array | null> {
   return started;
 }
 
-export function useDocumentPreview(document: PreviewSource): PreviewState {
-  const previewable = isPreviewable(document);
+/**
+ * @param document документ или `null`, если файла нет (пункт чек-листа
+ *   без вложений) — тогда превью нет. `null` принимается, чтобы вызывающий
+ *   не вызывал хук по условию.
+ */
+export function useDocumentPreview(
+  document: PreviewSource | null,
+): PreviewState {
+  const previewable = document !== null && isPreviewable(document);
   const [state, setState] = useState<PreviewState>(
     previewable ? LOADING : NONE,
   );
 
-  const { id, mimeType, sizeBytes, filePath } = document;
+  const id = document?.id ?? null;
+  const mimeType = document?.mimeType ?? null;
+  const sizeBytes = document?.sizeBytes ?? null;
+  const filePath = document?.filePath ?? '';
 
   useEffect(() => {
-    if (!previewable) {
+    if (!previewable || id === null) {
       setState(NONE);
       return undefined;
     }

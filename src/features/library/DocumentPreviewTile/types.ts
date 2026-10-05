@@ -6,8 +6,3 @@ export type DocumentPreviewTileProps = {
   /** Префикс: картинка — `${testID}-preview`, заглушка — `-preview-placeholder`. */
   testID: string;
 };
-
-export type LoadedTileProps = {
-  document: PreviewSource;
-  testID: string;
-};

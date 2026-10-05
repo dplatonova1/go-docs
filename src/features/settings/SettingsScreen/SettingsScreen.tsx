@@ -55,7 +55,6 @@ import {
   SectionTitle,
   SelectedMark,
   pressedStyle,
-  selectedOptionStyle,
 } from './styles';
 import type { SaveState } from './types';
 
@@ -135,7 +134,6 @@ export function SettingsScreen() {
                 testID={`${LOCALE_TEST_ID_PREFIX}-${option}`}
                 style={({ pressed }) => [
                   selected ? theme.field.focused : theme.field.rest,
-                  selected && selectedOptionStyle,
                   pressed && pressedStyle,
                 ]}
                 onPress={() => handleSelect(option)}
@@ -185,7 +183,6 @@ export function SettingsScreen() {
                 testID={`${THEME_TEST_ID_PREFIX}-${option}`}
                 style={({ pressed }) => [
                   selected ? theme.field.focused : theme.field.rest,
-                  selected && selectedOptionStyle,
                   pressed && pressedStyle,
                 ]}
                 onPress={() => handleSelectTheme(option)}

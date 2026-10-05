@@ -18,7 +18,9 @@
  * styled-components не переводит (см. `shadows.ts`).
  */
 
-import type { BoxShadowValue, ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
+
+import { rim } from './helpers';
 
 export type CardStyle = {
   /** Слои карточки поверх `surface`. */
@@ -28,18 +30,6 @@ export type CardStyle = {
   /** Линия между содержимым и нижней строкой карточки. */
   readonly divider: string;
 };
-
-/** Кант в 1 точку внутренней тенью — как у кнопок и полей. */
-function rim(color: string): BoxShadowValue {
-  return {
-    inset: true,
-    offsetX: 0,
-    offsetY: 0,
-    blurRadius: 0,
-    spreadDistance: 1,
-    color,
-  };
-}
 
 export const DARK_CARD: CardStyle = {
   fill: {
@@ -91,7 +81,8 @@ export const LIGHT_CARD: CardStyle = {
   },
   // Плитка — бледно-янтарная, как на референсе.
   media: {
-    backgroundImage: 'linear-gradient(135deg, #FDF1DC 0%, #FBE7C6 100%)',
+    // Затемнено на ступень 2026-10-05.
+    backgroundImage: 'linear-gradient(135deg, #FCE9C9 0%, #FADFB3 100%)',
     boxShadow: [rim('rgba(255, 255, 255, 0.8)')],
   },
   divider: 'rgba(110, 125, 180, 0.16)',

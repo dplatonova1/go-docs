@@ -22,6 +22,13 @@ export const Meta = styled.Text`
   color: ${({ theme }) => theme.colors.textSecondary};
 `;
 
+/** Пометка детектора качества — как в пункте чек-листа. */
+export const QualityNote = styled.Text`
+  ${textSize(13)}
+  font-family: ${FONTS.regular};
+  color: ${({ theme }) => theme.colors.danger};
+`;
+
 export const Actions = styled.View`
   flex-direction: row;
   flex-wrap: wrap;

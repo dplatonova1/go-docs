@@ -13,6 +13,7 @@ function attached(id: string, name: string | null): AttachedDocument {
     mimeType: 'application/pdf',
     sizeBytes: 1024,
     filePath: `documents/${id}`,
+    qualityFlag: null,
   };
 }
 
