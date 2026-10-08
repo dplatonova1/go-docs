@@ -39,7 +39,7 @@ const CLOUD_FILE = {
   hasRequestedType: true,
 };
 
-const LOCAL_URI = 'file:///data/user/0/com.godocs/cache/UUID/picked-document';
+const LOCAL_URI = 'file:///data/user/0/io.github.dplatonova1.godocs/cache/UUID/picked-document';
 
 function codeError(code: string) {
   return Object.assign(new Error(code), { code });

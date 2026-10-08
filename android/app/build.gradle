@@ -60,6 +60,19 @@ react {
 def enableProguardInReleaseBuilds = false
 
 /**
+ * Release signing key. android/keystore.properties is git-ignored and holds
+ * storeFile (relative to android/app), storePassword, keyAlias, keyPassword.
+ * Without it the release is signed with the debug key — fine for local
+ * testing, rejected by Google Play.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+def hasReleaseKeystore = keystoreProperties.containsKey("storeFile")
+
+/**
  * The preferred build flavor of JavaScriptCore (JSC)
  *
  * For example, to use the international variant, you can use:
@@ -77,13 +90,23 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace "com.godocs"
+    namespace "io.github.dplatonova1.godocs"
     defaultConfig {
-        applicationId "com.godocs"
+        applicationId "io.github.dplatonova1.godocs"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+    }
+    // One APK per ABI for manual distribution: each phone needs only its own
+    // native libraries. Release only, so `run-android` keeps a single APK.
+    splits {
+        abi {
+            enable gradle.startParameter.taskNames.any { it.toLowerCase().contains("release") }
+            reset()
+            include(*reactNativeArchitectures.split(","))
+            universalApk false
+        }
     }
     signingConfigs {
         debug {
@@ -92,15 +115,24 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseKeystore) {
+            release {
+                storeFile file(keystoreProperties["storeFile"])
+                storePassword keystoreProperties["storePassword"]
+                keyAlias keystoreProperties["keyAlias"]
+                keyPassword keystoreProperties["keyPassword"]
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            if (!hasReleaseKeystore) {
+                logger.warn("android/keystore.properties not found: release is signed with the DEBUG key")
+            }
+            signingConfig hasReleaseKeystore ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }

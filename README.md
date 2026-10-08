@@ -18,8 +18,9 @@
 Bare React Native 0.87.1, TypeScript (strict), New Architecture
 (Fabric + TurboModules), Hermes. `@op-engineering/op-sqlite`,
 `react-native-keychain`, `@dr.pogodin/react-native-fs`,
-`react-native-vision-camera` (V5, требует `react-native-nitro-modules` и
-`react-native-nitro-image`), `@cantoo/pdf-lib`.
+`react-native-nitro-image` (на `react-native-nitro-modules`), `@cantoo/pdf-lib`.
+`react-native-vision-camera` (V5) для MRZ ставится в Фазе 4: до неё
+библиотека снята ради размера сборки.
 
 Не Expo — нужен прямой доступ к нативным проектам
 ([ADR-0001](docs/adr/0001-bare-react-native-new-architecture.md)).

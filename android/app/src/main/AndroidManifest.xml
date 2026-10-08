@@ -10,13 +10,13 @@
     -->
 
     <!--
-      CAMERA — для сканирования машиносчитываемой зоны (MRZ) паспорта при
-      автозаполнении формы (react-native-vision-camera, Фаза 4). Кадр
-      обрабатывается на устройстве и никуда не передаётся — см.
+      CAMERA намеренно НЕ объявлена: камера нужна только для сканирования
+      MRZ паспорта (react-native-vision-camera, Фаза 4), а библиотека снята
+      2026-10-07 до этой фазы — она одна давала ~7 МБ на архитектуру.
+      Вернуть разрешение вместе с библиотекой; кадр обрабатывается на
+      устройстве и никуда не передаётся — см.
       docs/adr/0005-mrz-with-manual-confirmation.md.
     -->
-    <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
 
     <!--
       Разрешения на общее хранилище приходят из манифеста

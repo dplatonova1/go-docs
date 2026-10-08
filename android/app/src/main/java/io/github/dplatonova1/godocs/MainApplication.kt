@@ -1,4 +1,4 @@
-package com.godocs
+package io.github.dplatonova1.godocs
 
 import android.app.Application
 import com.facebook.react.PackageList

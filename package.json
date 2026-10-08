@@ -33,7 +33,6 @@
     "react-native-screens": "^4.28.0",
     "react-native-share": "^12.3.1",
     "react-native-svg": "^15.15.5",
-    "react-native-vision-camera": "^5.2.3",
     "styled-components": "^6.5.3"
   },
   "devDependencies": {

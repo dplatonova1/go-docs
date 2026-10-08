@@ -199,11 +199,20 @@ security-аудита 2026-09-07. Проверить перед началом �
   первой и третьей `AndroidManifest.xml` пуст, у второй объявлен только
   FileProvider, но правило 3 [ADR-0009](docs/adr/0009-minimal-android-permissions.md)
   требует смотреть итоговый манифест, а не манифест библиотеки.
+  `react-native-vision-camera` и разрешение `CAMERA` сняты 2026-10-07 до
+  Фазы 4 (размер сборки) — при возврате снова проверить манифест.
+- **Release собирается отдельным APK на архитектуру** (`splits.abi` в
+  [android/app/build.gradle](android/app/build.gradle), только
+  `armeabi-v7a` и `arm64-v8a`) — для ручной раздачи. Для Google Play
+  нужен AAB (`bundleRelease`) и, если остаются сплиты, свой `versionCode`
+  на каждую архитектуру.
 - **Сборка iOS ни разу не проверялась** — `pod install` и запуск нужны
   хотя бы раз до публикации; новые нативные зависимости добавляются без
   такой проверки.
-- **Свой релизный keystore** — сейчас release подписывается debug-ключом
-  (дефолт шаблона React Native).
+- **Свой релизный keystore** — подпись читается из
+  `android/keystore.properties` (в `.gitignore`, шаблон —
+  `keystore.properties.example`); пока файла нет, release подписывается
+  debug-ключом с предупреждением в логе сборки.
 - **Лицензия иконок** ([ADR-0022](docs/adr/0022-bottom-tabs.md)). Иконки
   в [src/components/Icon](src/components/Icon/constants.ts) взяты из
   присланных SVG — судя по именам и разметке, набор UIcons от Flaticon.

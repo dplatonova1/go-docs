@@ -10,7 +10,7 @@ import { StorageErrorCode, isStorageError } from '../errors';
 import { assertEnoughSpace } from '../fs';
 
 jest.mock('@dr.pogodin/react-native-fs', () => ({
-  DocumentDirectoryPath: '/data/user/0/com.godocs/files',
+  DocumentDirectoryPath: '/data/user/0/io.github.dplatonova1.godocs/files',
   exists: jest.fn(),
   getFSInfo: jest.fn(),
   mkdir: jest.fn(),

@@ -15,8 +15,8 @@ import {
 } from '../exportFile';
 
 jest.mock('@dr.pogodin/react-native-fs', () => ({
-  CachesDirectoryPath: '/data/user/0/com.godocs/cache',
-  DocumentDirectoryPath: '/data/user/0/com.godocs/files',
+  CachesDirectoryPath: '/data/user/0/io.github.dplatonova1.godocs/cache',
+  DocumentDirectoryPath: '/data/user/0/io.github.dplatonova1.godocs/files',
   exists: jest.fn(),
   mkdir: jest.fn(),
   moveFile: jest.fn(),

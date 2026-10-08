@@ -1,4 +1,4 @@
-package com.godocs
+package io.github.dplatonova1.godocs
 
 import com.facebook.react.ReactActivity
 import com.facebook.react.ReactActivityDelegate

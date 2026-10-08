@@ -16,7 +16,7 @@ import {
 } from '../localCopy';
 
 jest.mock('@dr.pogodin/react-native-fs', () => ({
-  CachesDirectoryPath: '/data/user/0/com.godocs/cache',
+  CachesDirectoryPath: '/data/user/0/io.github.dplatonova1.godocs/cache',
   exists: jest.fn(),
   readFile: jest.fn(),
   stat: jest.fn(),
@@ -25,7 +25,7 @@ jest.mock('@dr.pogodin/react-native-fs', () => ({
 
 const fs = require('@dr.pogodin/react-native-fs');
 
-const ANDROID_CACHE = '/data/user/0/com.godocs/cache';
+const ANDROID_CACHE = '/data/user/0/io.github.dplatonova1.godocs/cache';
 const COPY_DIR = `${ANDROID_CACHE}/0f3c2b7e-uuid`;
 const COPY_URI = `file://${COPY_DIR}/picked-document`;
 
@@ -78,12 +78,12 @@ describe('locateCachedCopy', () => {
   });
 
   it.each([
-    ['вне кэша', 'file:///data/user/0/com.godocs/files/UUID/godocs.sqlite'],
+    ['вне кэша', 'file:///data/user/0/io.github.dplatonova1.godocs/files/UUID/godocs.sqlite'],
     ['через ..', `file://${ANDROID_CACHE}/../files/godocs.sqlite`],
     ['через закодированные ..', `file://${ANDROID_CACHE}/%2e%2e/files/x`],
     [
       'соседний каталог с тем же префиксом',
-      'file:///data/user/0/com.godocs/cache-evil/UUID/f',
+      'file:///data/user/0/io.github.dplatonova1.godocs/cache-evil/UUID/f',
     ],
     ['файл прямо в корне кэша', `file://${ANDROID_CACHE}/picked-document`],
     ['глубже, чем <UUID>/<имя>', `file://${COPY_DIR}/nested/picked-document`],
@@ -137,7 +137,7 @@ describe('readCachedCopy', () => {
 
   it('путь вне кэша не читается вовсе', async () => {
     const error = await readCachedCopy(
-      'file:///data/user/0/com.godocs/files/UUID/godocs.sqlite',
+      'file:///data/user/0/io.github.dplatonova1.godocs/files/UUID/godocs.sqlite',
       10,
     ).catch((e: unknown) => e);
 
